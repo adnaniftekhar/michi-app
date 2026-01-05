@@ -7,9 +7,10 @@ interface CardProps {
   href?: string
   onClick?: () => void
   className?: string
+  style?: React.CSSProperties
 }
 
-export function Card({ children, href, onClick, className }: CardProps) {
+export function Card({ children, href, onClick, className, style }: CardProps) {
   const baseStyles = {
     backgroundColor: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
@@ -28,6 +29,7 @@ export function Card({ children, href, onClick, className }: CardProps) {
       style={{
         ...baseStyles,
         ...interactiveStyles,
+        ...style,
       } as React.CSSProperties}
       onClick={onClick}
       onKeyDown={(e) => {

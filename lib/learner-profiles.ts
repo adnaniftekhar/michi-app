@@ -5,6 +5,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   alice: {
     name: 'Alice',
     timezone: 'America/New_York',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['morning', 'afternoon'],
       preferredDuration: 'medium',
@@ -30,6 +31,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   bob: {
     name: 'Bob',
     timezone: 'Europe/London',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['evening'],
       preferredDuration: 'long',
@@ -54,6 +56,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   sam: {
     name: 'Sam',
     timezone: 'Asia/Tokyo',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['morning', 'evening'],
       preferredDuration: 'short',
@@ -79,6 +82,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   dana: {
     name: 'Dana',
     timezone: 'America/Los_Angeles',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['morning'],
       preferredDuration: 'medium',
@@ -103,6 +107,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   eve: {
     name: 'Eve',
     timezone: 'Europe/Paris',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['afternoon', 'evening'],
       preferredDuration: 'long',
@@ -127,6 +132,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   frank: {
     name: 'Frank',
     timezone: 'America/Chicago',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['morning', 'afternoon'],
       preferredDuration: 'short',
@@ -152,6 +158,7 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   grace: {
     name: 'Grace',
     timezone: 'Australia/Sydney',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['morning'],
       preferredDuration: 'medium',
@@ -176,11 +183,12 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   henry: {
     name: 'Henry',
     timezone: 'America/New_York',
+    languages: [],
     preferences: {
       preferredLearningTimes: ['evening'],
       preferredDuration: 'long',
       interactionStyle: 'solo',
-      contentFormat: ['reading', 'reflection', 'audio'],
+      contentFormat: ['reading', 'reflection', 'video'],
     },
     constraints: {
       maxDailyMinutes: 180,

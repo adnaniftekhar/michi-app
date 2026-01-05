@@ -56,6 +56,13 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
   const [timezoneOverride, setTimezoneOverride] = useState(false)
   const [detectedTz, setDetectedTz] = useState<string>('')
 
+  // Type narrowing helpers for reflection styles
+  const REFLECTION_STYLE_VALUES = ['discussion', 'journal', 'artistic', 'analytical'] as const;
+  type ReflectionStyle = (typeof REFLECTION_STYLE_VALUES)[number];
+
+  const isReflectionStyle = (v: unknown): v is ReflectionStyle =>
+    typeof v === 'string' && (REFLECTION_STYLE_VALUES as readonly string[]).includes(v);
+
   useEffect(() => {
     if (isOpen) {
       setDetectedTz(detectTimezone())
@@ -119,8 +126,11 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
       },
       experientialProfile: {
         preferredFieldExperiences: data.preferredFieldExperiences,
-        reflectionStyle: data.reflectionStyles[0] || 'journal', // Keep for backward compat
-        reflectionStyles: data.reflectionStyles,
+        reflectionStyle: (() => {
+          const reflectionStyles: ReflectionStyle[] = (data.reflectionStyles ?? []).filter(isReflectionStyle);
+          return reflectionStyles[0] ?? 'journal';
+        })(), // Keep for backward compat
+        reflectionStyles: (data.reflectionStyles ?? []).filter(isReflectionStyle),
         inquiryApproach: data.inquiryApproach,
       },
       socialPreferences: {
@@ -689,11 +699,11 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
                         Collaboration Preference
                       </label>
                       <div className="space-y-2">
-                        {[
-                          { value: 'prefer-solo', label: 'Prefer Solo', helper: 'Works best independently' },
-                          { value: 'prefer-with-others', label: 'Prefer With Others', helper: 'Thrives in group settings' },
-                          { value: 'either-works', label: 'Either Works', helper: 'Comfortable with both approaches' },
-                        ].map((option) => (
+                        {([
+                          { value: 'prefer-solo' as const, label: 'Prefer Solo', helper: 'Works best independently' },
+                          { value: 'prefer-with-others' as const, label: 'Prefer With Others', helper: 'Thrives in group settings' },
+                          { value: 'either-works' as const, label: 'Either Works', helper: 'Comfortable with both approaches' },
+                        ] as const).map((option) => (
                           <label
                             key={option.value}
                             className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2"

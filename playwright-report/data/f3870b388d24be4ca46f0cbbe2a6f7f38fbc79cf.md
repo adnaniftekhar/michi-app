@@ -1,0 +1,43 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "Travel Learner" [ref=e7] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e9]:
+          - generic [ref=e10]: "Demo User:"
+          - combobox "Select demo user" [ref=e12]:
+            - option "Alice" [selected]
+            - option "Bob"
+            - option "Sam"
+    - main [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - heading "Trips" [level=1] [ref=e18]
+            - paragraph [ref=e19]: Manage your travel learning trips
+          - button "Create Trip" [ref=e21] [cursor=pointer]
+        - link "Learning Trip May 31, 2024 - Jun 4, 2024 📍 Location" [ref=e23] [cursor=pointer]:
+          - /url: /trips/trip-1767559970534
+          - generic [ref=e24]:
+            - generic [ref=e25]:
+              - heading "Learning Trip" [level=2] [ref=e26]
+              - generic [ref=e27]: →
+            - paragraph [ref=e28]: May 31, 2024 - Jun 4, 2024
+            - paragraph [ref=e29]: 📍 Location
+  - generic [ref=e34] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e35]:
+      - img [ref=e36]
+    - generic [ref=e39]:
+      - button "Open issues overlay" [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: "0"
+          - generic [ref=e43]: "1"
+        - generic [ref=e44]: Issue
+      - button "Collapse issues badge" [ref=e45]:
+        - img [ref=e46]
+  - alert [ref=e48]
+```

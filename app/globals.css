@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* MICHI Design System Colors */
+  --color-michi-green: #6FBF9A;
+  --color-background: #0F1419;
+  --color-surface: #161C22;
+  --color-border: #242C33;
+  --color-text-primary: #E6EDF3;
+  --color-text-secondary: #9AA4AE;
+  
+  /* Legacy support (mapped to MICHI colors) */
+  --color-primary: var(--color-michi-green);
+  --color-primary-hover: #5FA889;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-focus-ring: var(--color-michi-green);
+  --color-focus-ring-offset: var(--color-background);
+
+  /* Spacing scale */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+
+  /* Typography - Inter font */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --line-height-tight: 1.4;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+
+  /* Radius - MICHI Design System */
+  --radius-button: 8px;
+  --radius-input: 10px;
+  --radius-card: 12px;
+
+  /* Shadows - subtle */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+
+  /* Focus ring */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus styles - visible on all interactive elements */
+*:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* Ensure buttons and links are keyboard accessible */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Remove default focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
 }

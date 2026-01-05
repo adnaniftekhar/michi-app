@@ -1,0 +1,78 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "Travel Learner" [ref=e7] [cursor=pointer]:
+            - /url: /
+          - navigation "Breadcrumb" [ref=e8]:
+            - link "Trips" [ref=e9] [cursor=pointer]:
+              - /url: /
+            - generic [ref=e10]: /
+            - generic [ref=e11]: Trip
+        - generic [ref=e13]:
+          - generic [ref=e14]: "Demo User:"
+          - combobox "Select demo user" [ref=e16]:
+            - option "Alice" [selected]
+            - option "Bob"
+            - option "Sam"
+    - main [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - navigation "Breadcrumb" [ref=e20]:
+            - list [ref=e21]:
+              - listitem [ref=e22]:
+                - link "Trips" [ref=e23] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e24]:
+                - generic [ref=e25]: /
+                - link "Schedule Trip" [ref=e26] [cursor=pointer]:
+                  - /url: /trips/trip-1767559995383
+          - generic [ref=e28]:
+            - heading "Schedule Trip" [level=1] [ref=e29]
+            - paragraph [ref=e30]: "May 31, 2024 - Jun 2, 2024 • Location • Local time: America/New_York"
+        - generic [ref=e31]:
+          - tablist [ref=e32]:
+            - tab "Itinerary" [ref=e33]
+            - tab "Schedule" [selected] [ref=e34]
+            - tab "Activity Logs" [ref=e35]
+            - tab "Learning Targets" [ref=e36]
+          - tabpanel "Schedule" [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e39]:
+                - generic [ref=e40]:
+                  - heading "Schedule Blocks" [level=2] [ref=e41]
+                  - paragraph [ref=e42]: Learning blocks for your trip (America/New_York)
+                - button "Generate Schedule" [active] [ref=e44] [cursor=pointer]
+              - generic [ref=e46]:
+                - generic [ref=e49]:
+                  - generic [ref=e50]:
+                    - generic [ref=e51]: Learning Block
+                    - generic [ref=e52]: Generated
+                  - generic [ref=e53]: Jun 1, 2024, 10:00 AM PDT • 60 min
+                - generic [ref=e56]:
+                  - generic [ref=e57]:
+                    - generic [ref=e58]: Learning Block
+                    - generic [ref=e59]: Generated
+                  - generic [ref=e60]: Jun 2, 2024, 10:00 AM PDT • 60 min
+                - generic [ref=e63]:
+                  - generic [ref=e64]:
+                    - generic [ref=e65]: Learning Block
+                    - generic [ref=e66]: Generated
+                  - generic [ref=e67]: Jun 3, 2024, 10:00 AM PDT • 60 min
+  - generic [ref=e72] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e73]:
+      - img [ref=e74]
+    - generic [ref=e77]:
+      - button "Open issues overlay" [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]: "0"
+          - generic [ref=e81]: "1"
+        - generic [ref=e82]: Issue
+      - button "Collapse issues badge" [ref=e83]:
+        - img [ref=e84]
+  - alert [ref=e86]
+```

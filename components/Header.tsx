@@ -9,9 +9,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Button } from './ui/Button'
 import { useState, useEffect, useRef } from 'react'
 import { CreateLearnerModal } from './CreateLearnerModal'
+import { ConfirmDialog } from './ui/ConfirmDialog'
 import { saveCustomUser, saveCustomProfile } from '@/lib/custom-users'
 import { showToast } from './ui/Toast'
-import { ConfirmDialog } from './ui/ConfirmDialog'
 
 export function Header() {
   const { currentUser, setCurrentUserId } = useDemoUser()
@@ -151,48 +151,69 @@ export function Header() {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowLearnerMenu(!showLearnerMenu)}
-                className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                 style={{
-                  padding: 'var(--spacing-2) var(--spacing-3)',
                   fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-primary)',
-                  backgroundColor: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
+                  padding: 'var(--spacing-2) var(--spacing-3)',
                   borderRadius: 'var(--radius-button)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: showLearnerMenu ? 'var(--color-surface-hover)' : 'transparent',
                   outlineColor: 'var(--color-focus-ring)',
-                  transition: 'background-color 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                  if (!showLearnerMenu) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
                 }}
                 aria-label="Select learner"
                 aria-expanded={showLearnerMenu}
               >
                 <span style={{ color: 'var(--color-text-secondary)' }}>Learner:</span>
                 <span>{currentUser.name}</span>
-                <span style={{ color: 'var(--color-text-tertiary)' }}>
-                  {showLearnerMenu ? '▲' : '▼'}
-                </span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  style={{
+                    transform: showLearnerMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                >
+                  <path
+                    d="M3 4.5L6 7.5L9 4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  />
+                </svg>
               </button>
               {showLearnerMenu && (
                 <div
-                  className="absolute right-0 mt-2 z-50"
                   style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: 'var(--spacing-2)',
                     minWidth: '200px',
                     backgroundColor: 'var(--color-surface)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-card)',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    zIndex: 50,
                     overflow: 'hidden',
                   }}
                 >
                   <div
                     style={{
-                      borderBottom: '1px solid var(--color-border-subtle)',
                       padding: 'var(--spacing-2)',
+                      borderBottom: '1px solid var(--color-border-subtle)',
                     }}
                   >
                     <div
@@ -201,7 +222,6 @@ export function Header() {
                         color: 'var(--color-text-secondary)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        fontWeight: 'var(--font-weight-medium)',
                         padding: 'var(--spacing-2) var(--spacing-3)',
                       }}
                     >
@@ -214,20 +234,18 @@ export function Header() {
                         key={user.id}
                         onClick={() => {
                           setCurrentUserId(user.id)
-                          // Reload users after switching to get updated names
                           if (mounted) {
                             setUsers(getAllUsers())
                           }
                           setShowLearnerMenu(false)
                         }}
-                        className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                        className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                         style={{
                           padding: 'var(--spacing-3)',
                           fontSize: 'var(--font-size-sm)',
                           color: currentUser.id === user.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                          backgroundColor: currentUser.id === user.id ? 'var(--color-background)' : 'transparent',
+                          backgroundColor: currentUser.id === user.id ? 'var(--color-surface-hover)' : 'transparent',
                           outlineColor: 'var(--color-focus-ring)',
-                          transition: 'background-color 0.2s ease',
                         }}
                         onMouseEnter={(e) => {
                           if (currentUser.id !== user.id) {
@@ -260,13 +278,13 @@ export function Header() {
                         setShowLearnerMenu(false)
                         setShowResetConfirm(true)
                       }}
-                      className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                       style={{
                         padding: 'var(--spacing-3)',
                         fontSize: 'var(--font-size-sm)',
                         color: 'var(--color-danger)',
+                        backgroundColor: 'transparent',
                         outlineColor: 'var(--color-focus-ring)',
-                        transition: 'background-color 0.2s ease',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
@@ -304,7 +322,7 @@ export function Header() {
         onClose={() => setShowResetConfirm(false)}
         onConfirm={handleResetData}
         title="Reset demo data"
-        message="This will clear all your trips, schedules, and activity logs and restore the default demo data. This action cannot be undone."
+        message="Are you sure you want to reset all demo data? This will restore all trips, schedules, and logs to their initial seeded state. This action cannot be undone."
         confirmLabel="Reset data"
         cancelLabel="Cancel"
         variant="danger"

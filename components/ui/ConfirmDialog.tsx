@@ -1,3 +1,5 @@
+'use client'
+
 import { ReactNode } from 'react'
 import { Button } from './Button'
 
@@ -64,8 +66,8 @@ export function ConfirmDialog({
             onClick={onClose}
             className="text-2xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-opacity"
             style={{
-              color: 'var(--color-text-secondary)',
               outlineColor: 'var(--color-focus-ring)',
+              color: 'var(--color-text-secondary)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '0.7'

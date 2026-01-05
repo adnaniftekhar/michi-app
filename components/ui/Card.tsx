@@ -20,15 +20,16 @@ export function Card({ children, href, onClick, className, style }: CardProps) {
 
   const interactiveStyles = href || onClick ? {
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'background-color 0.2s ease, border-color 0.2s ease',
   } : {}
 
   const content = (
     <div
-      className={clsx('focus-within:ring-2 focus-within:ring-offset-2', className)}
+      className={clsx('focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2', className)}
       style={{
         ...baseStyles,
         ...interactiveStyles,
+        outlineColor: 'var(--color-focus-ring)',
         ...style,
       } as React.CSSProperties}
       onClick={onClick}
@@ -36,6 +37,18 @@ export function Card({ children, href, onClick, className, style }: CardProps) {
         if ((e.key === 'Enter' || e.key === ' ') && onClick) {
           e.preventDefault()
           onClick()
+        }
+      }}
+      onMouseEnter={(e) => {
+        if (href || onClick) {
+          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+          e.currentTarget.style.borderColor = 'var(--color-border)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (href || onClick) {
+          e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+          e.currentTarget.style.borderColor = 'var(--color-border)'
         }
       }}
       tabIndex={onClick ? 0 : undefined}
@@ -50,7 +63,10 @@ export function Card({ children, href, onClick, className, style }: CardProps) {
       <Link
         href={href}
         className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        style={{ outlineColor: 'var(--color-focus-ring)' }}
+        style={{ 
+          outlineColor: 'var(--color-focus-ring)',
+          textDecoration: 'none',
+        }}
       >
         {content}
       </Link>

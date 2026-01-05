@@ -211,15 +211,8 @@ export function ScheduleItineraryTab({
         description={`Your learning schedule (${timezone})`}
         action={
           trip.learningTarget ? (
-            <Button onClick={handleGenerateAIPathway} disabled={isGenerating}>
-              {isGenerating ? (
-                <span className="flex items-center">
-                  <LoadingSpinner size="sm" />
-                  <span className="ml-2">Generating...</span>
-                </span>
-              ) : (
-                'Generate (AI Draft)'
-              )}
+            <Button onClick={handleGenerateAIPathway} disabled={isGenerating} isLoading={isGenerating}>
+              {isGenerating ? 'Generating pathway...' : 'Generate learning pathway'}
             </Button>
           ) : (
             <Button variant="secondary" disabled>
@@ -229,13 +222,13 @@ export function ScheduleItineraryTab({
         }
         emptyState={{
           message: trip.learningTarget
-            ? 'No schedule items yet. Generate an AI pathway to create learning blocks.'
+            ? 'No schedule items yet. Generate a learning pathway to create schedule blocks.'
             : 'Set a learning target first, then generate your schedule.',
         }}
         isEmpty={sortedBlocks.length === 0}
       >
         {sortedBlocks.length > 0 && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
             {sortedBlocks.map((block) => {
               const isExpanded = expandedCardId === block.id
 
@@ -243,65 +236,49 @@ export function ScheduleItineraryTab({
                 <Card
                   key={block.id}
                   onClick={() => setExpandedCardId(isExpanded ? null : block.id)}
-                  className="cursor-pointer transition-all"
+                  className="cursor-pointer"
                   style={{
-                    backgroundColor: isExpanded ? '#ffffff' : 'var(--color-surface)',
-                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                    backgroundColor: isExpanded ? 'var(--color-surface-hover)' : 'var(--color-surface)',
                   }}
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Badge variant="draft">Schedule</Badge>
+                      <div className="flex items-center gap-2" style={{ marginBottom: 'var(--spacing-2)' }}>
                         {block.isGenerated && (
-                          <Badge variant="draft">AI Generated</Badge>
+                          <Badge variant="draft">Draft</Badge>
                         )}
                       </div>
                       <h3
-                        className="font-semibold mb-2"
                         style={{
-                          fontSize: '18px',
-                          lineHeight: '1.4',
-                          color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                          fontSize: 'var(--font-size-lg)',
+                          lineHeight: 'var(--line-height-tight)',
+                          fontWeight: 'var(--font-weight-semibold)',
+                          color: 'var(--color-text-primary)',
+                          marginBottom: 'var(--spacing-2)',
                         }}
                       >
                         {block.title}
                       </h3>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <span
-                          className="text-sm"
-                          style={{
-                            color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
-                          }}
-                        >
+                      <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 'var(--font-size-sm)' }}>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>
                           {formatDate(block.startTime)}
                         </span>
-                        <span
-                          className="text-sm"
-                          style={{
-                            color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
-                          }}
-                        >
+                        <span style={{ color: 'var(--color-text-tertiary)' }}>•</span>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>
                           {formatDateTime(block.startTime).split('•')[1]?.trim()}
                         </span>
-                        <span
-                          className="text-sm font-medium"
-                          style={{
-                            color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
-                          }}
-                        >
+                        <span style={{ color: 'var(--color-text-tertiary)' }}>•</span>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>
                           {block.duration} min
                         </span>
                         {block.location && (
-                          <span
-                            className="text-sm"
-                            style={{
-                              color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
-                            }}
-                          >
-                            📍 {block.location}
-                          </span>
+                          <>
+                            <span style={{ color: 'var(--color-text-tertiary)' }}>•</span>
+                            <span style={{ color: 'var(--color-text-secondary)' }}>
+                              {block.location}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -309,7 +286,7 @@ export function ScheduleItineraryTab({
                       {isExpanded && (
                         <>
                           <Button
-                            variant="secondary"
+                            variant="tertiary"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -319,12 +296,13 @@ export function ScheduleItineraryTab({
                             Edit
                           </Button>
                           <Button
-                            variant="danger"
+                            variant="tertiary"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteBlock(block.id)
                             }}
+                            style={{ color: 'var(--color-danger)' }}
                           >
                             Delete
                           </Button>
@@ -336,10 +314,16 @@ export function ScheduleItineraryTab({
                           e.stopPropagation()
                           setExpandedCardId(isExpanded ? null : block.id)
                         }}
-                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-opacity-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                         style={{
-                          color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                          color: 'var(--color-text-secondary)',
                           outlineColor: 'var(--color-focus-ring)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
                         }}
                         aria-label={isExpanded ? 'Collapse' : 'Expand'}
                       >
@@ -350,32 +334,44 @@ export function ScheduleItineraryTab({
 
                   {/* Expanded Content */}
                   {isExpanded && (
-                    <div className="mt-6 pt-6" style={{ borderTop: isExpanded ? '1px solid #e5e7eb' : '1px solid var(--color-border)' }}>
-                      <div className="space-y-6">
+                    <div 
+                      style={{ 
+                        marginTop: 'var(--spacing-6)',
+                        paddingTop: 'var(--spacing-6)',
+                        borderTop: '1px solid var(--color-border-subtle)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)' }}>
                         {/* Two-column layout for desktop */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 'var(--spacing-6)' }}>
                           {/* Left Column: PBL Elements */}
-                          <div className="space-y-5">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-5)' }}>
                             {block.drivingQuestion && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Driving Question
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.drivingQuestion}
@@ -384,24 +380,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.inquiryTask && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Inquiry Task
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.inquiryTask}
@@ -410,24 +412,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.reflectionPrompt && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Reflection Prompt
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.reflectionPrompt}
@@ -437,27 +445,33 @@ export function ScheduleItineraryTab({
                           </div>
 
                           {/* Right Column: Logistics & Field Experience */}
-                          <div className="space-y-5">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-5)' }}>
                             {block.description && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Description
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.description}
@@ -466,24 +480,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.fieldExperience && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Field Experience
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.fieldExperience}
@@ -492,24 +512,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.location && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Location
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.location}
@@ -518,24 +544,31 @@ export function ScheduleItineraryTab({
                             )}
                             {block.notes && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Notes
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch] whitespace-pre-line"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
+                                    whiteSpace: 'pre-line',
                                   }}
                                 >
                                   {block.notes}
@@ -544,24 +577,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.artifact && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Artifact
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.artifact}
@@ -570,24 +609,30 @@ export function ScheduleItineraryTab({
                             )}
                             {block.critiqueStep && (
                               <div
-                                className="p-4 rounded-xl"
                                 style={{
-                                  backgroundColor: isExpanded ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
+                                  padding: 'var(--spacing-4)',
+                                  borderRadius: 'var(--radius-card)',
+                                  backgroundColor: 'var(--color-background)',
                                 }}
                               >
                                 <div
-                                  className="text-xs uppercase tracking-wide font-semibold mb-2"
                                   style={{
-                                    color: isExpanded ? '#6b7280' : 'var(--color-text-secondary)',
+                                    fontSize: 'var(--font-size-xs)',
+                                    textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
+                                    fontWeight: 'var(--font-weight-medium)',
+                                    color: 'var(--color-text-secondary)',
+                                    marginBottom: 'var(--spacing-2)',
                                   }}
                                 >
                                   Critique Step
                                 </div>
                                 <p
-                                  className="text-[15px] leading-7 max-w-[72ch]"
                                   style={{
-                                    color: isExpanded ? '#111827' : 'var(--color-text-primary)',
+                                    fontSize: 'var(--font-size-base)',
+                                    lineHeight: 'var(--line-height-relaxed)',
+                                    color: 'var(--color-text-primary)',
+                                    maxWidth: '72ch',
                                   }}
                                 >
                                   {block.critiqueStep}

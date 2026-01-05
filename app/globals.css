@@ -2,29 +2,45 @@
 
 
 :root {
-  /* MICHI Design System Colors */
-  --color-michi-green: #6FBF9A;
+  /* MICHI Design System Colors - Backgrounds */
   --color-background: #0F1419;
   --color-surface: #161C22;
+  --color-surface-hover: #1C2329;
+  
+  /* Borders & Dividers */
   --color-border: #242C33;
+  --color-border-subtle: #1A2026;
+  
+  /* Text */
   --color-text-primary: #E6EDF3;
   --color-text-secondary: #9AA4AE;
+  --color-text-tertiary: #6B7280;
+  --color-text-muted: #9AA4AE; /* Alias for secondary, ensures AA contrast */
+  
+  /* Primary (Michi Green) - Use sparingly for primary actions only */
+  --color-michi-green: #6FBF9A;
+  --color-michi-green-hover: #5FA889;
+  --color-michi-green-light: rgba(111, 191, 154, 0.1);
+  
+  /* Semantic Colors */
+  --color-danger: #DC2626;
+  --color-danger-hover: #B91C1C;
+  --color-success: #10B981;
   
   /* Legacy support (mapped to MICHI colors) */
   --color-primary: var(--color-michi-green);
-  --color-primary-hover: #5FA889;
-  --color-danger: #dc2626;
-  --color-danger-hover: #b91c1c;
+  --color-primary-hover: var(--color-michi-green-hover);
   --color-focus-ring: var(--color-michi-green);
   --color-focus-ring-offset: var(--color-background);
 
-  /* Spacing scale */
+  /* Spacing Scale (4px base unit) */
   --spacing-1: 4px;
   --spacing-2: 8px;
   --spacing-3: 12px;
   --spacing-4: 16px;
   --spacing-6: 24px;
   --spacing-8: 32px;
+  --spacing-12: 48px;
 
   /* Typography - Inter font */
   --font-size-xs: 12px;
@@ -33,19 +49,25 @@
   --font-size-lg: 18px;
   --font-size-xl: 24px;
   --font-size-2xl: 32px;
+  
+  /* Line Heights */
   --line-height-tight: 1.4;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.6;
+  
+  /* Font Weights */
   --font-weight-normal: 400;
+  --font-weight-medium: 500;
   --font-weight-semibold: 600;
 
   /* Radius - MICHI Design System */
+  --radius-sm: 6px;
   --radius-button: 8px;
   --radius-input: 10px;
   --radius-card: 12px;
 
-  /* Shadows - subtle */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+  /* Shadows - removed (use background color for elevation) */
+  --shadow-sm: none;
 
   /* Focus ring */
   --focus-ring-width: 2px;

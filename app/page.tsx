@@ -57,16 +57,16 @@ export default function Home() {
     <>
       <PageHeader
         title="Trips"
-        subtitle="Manage your travel learning trips"
+        subtitle="Plan and manage your learning journeys"
         action={
           !showForm && (
-            <Button onClick={() => setShowForm(true)}>Create Trip</Button>
+            <Button onClick={() => setShowForm(true)}>Create trip</Button>
           )
         }
       />
 
       {showForm && (
-        <div className="mb-8">
+        <div style={{ marginBottom: 'var(--spacing-8)' }}>
           <CreateTripForm
             onSubmit={handleCreateTrip}
             onCancel={() => setShowForm(false)}
@@ -79,47 +79,44 @@ export default function Home() {
           message="No trips yet. Create your first trip to get started."
           action={
             !showForm && (
-              <Button onClick={() => setShowForm(true)}>Create Trip</Button>
+              <Button onClick={() => setShowForm(true)}>Create trip</Button>
             )
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div 
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+          style={{
+            gap: 'var(--spacing-6)',
+          }}
+        >
           {trips.map((trip) => (
             <Card key={trip.id} href={`/trips/${trip.id}`}>
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <h2
-                  className="flex-1"
-                  style={{
-                    fontSize: 'var(--font-size-lg)',
-                    lineHeight: 'var(--line-height-tight)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  {trip.title}
-                </h2>
-                <span
-                  className="text-sm flex-shrink-0"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  aria-hidden="true"
-                >
-                  →
-                </span>
-              </div>
-              <p
-                className="text-sm mb-2"
+              <h2
                 style={{
+                  fontSize: 'var(--font-size-lg)',
+                  lineHeight: 'var(--line-height-tight)',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  color: 'var(--color-text-primary)',
+                  marginBottom: 'var(--spacing-3)',
+                }}
+              >
+                {trip.title}
+              </h2>
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-secondary)',
                   lineHeight: 'var(--line-height-normal)',
+                  marginBottom: 'var(--spacing-2)',
                 }}
               >
                 {formatDateRange(trip.startDate, trip.endDate)}
               </p>
               <p
-                className="text-sm"
                 style={{
-                  color: 'var(--color-text-secondary)',
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-muted)',
                   lineHeight: 'var(--line-height-normal)',
                 }}
               >

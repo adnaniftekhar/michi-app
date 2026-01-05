@@ -39,66 +39,98 @@ export function AIPathwayModal({ isOpen, onClose, draft, onApply, isLoading, tri
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className="max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-md)',
+          borderRadius: 'var(--radius-card)',
         }}
       >
         <div
-          className="flex items-center justify-between p-4 border-b"
-          style={{ borderColor: 'var(--color-border)' }}
+          className="flex items-center justify-between"
+          style={{ 
+            padding: 'var(--spacing-6)',
+            borderBottom: '1px solid var(--color-border-subtle)',
+          }}
         >
-          <h2
-            className="font-semibold"
-            style={{
-              fontSize: 'var(--font-size-xl)',
-              lineHeight: 'var(--line-height-tight)',
-            }}
-          >
-            Draft Learning Pathway
-          </h2>
+          <div>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-xl)',
+                lineHeight: 'var(--line-height-tight)',
+                fontWeight: 'var(--font-weight-semibold)',
+                color: 'var(--color-text-primary)',
+                marginBottom: 'var(--spacing-1)',
+              }}
+            >
+              Draft learning pathway
+            </h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginTop: 'var(--spacing-1)',
+              }}
+            >
+              Review and adjust as needed
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="text-2xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            style={{ outlineColor: 'var(--color-focus-ring)' }}
+            className="text-2xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-opacity"
+            style={{ 
+              outlineColor: 'var(--color-focus-ring)',
+              color: 'var(--color-text-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.7'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+            }}
             aria-label="Close"
           >
             ×
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto" style={{ padding: 'var(--spacing-6)' }}>
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="flex flex-col items-center justify-center" style={{ 
+              padding: 'var(--spacing-12)',
+              gap: 'var(--spacing-4)',
+            }}>
               <LoadingSpinner size="lg" />
-              <div style={{ color: 'var(--color-text-secondary)' }}>
-                Generating learning pathway...
+              <div style={{ 
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--font-size-base)',
+              }}>
+                Generating pathway...
               </div>
             </div>
           )}
 
           {draft && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-6)' }}>
               {draft.summary && (
                 <Card>
                   <div
-                    className="font-medium mb-2"
                     style={{
                       fontSize: 'var(--font-size-base)',
-                      lineHeight: 'var(--line-height-tight)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-text-primary)',
+                      marginBottom: 'var(--spacing-2)',
                     }}
                   >
                     Summary
                   </div>
                   <p
                     style={{
-                      color: 'var(--color-text-primary)',
+                      color: 'var(--color-text-secondary)',
                       lineHeight: 'var(--line-height-normal)',
                     }}
                   >
@@ -108,20 +140,24 @@ export function AIPathwayModal({ isOpen, onClose, draft, onApply, isLoading, tri
               )}
 
               {draft.verifyLocally && (
-                <Card className="border-yellow-300" style={{ borderColor: '#fbbf24' }}>
+                <Card style={{ 
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-background)',
+                }}>
                   <div
-                    className="font-medium mb-2"
                     style={{
                       fontSize: 'var(--font-size-sm)',
-                      color: '#92400e',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 'var(--spacing-2)',
                     }}
                   >
-                    Verify Locally
+                    Verify locally
                   </div>
                   <p
-                    className="text-sm"
                     style={{
-                      color: '#78350f',
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
                       lineHeight: 'var(--line-height-normal)',
                     }}
                   >
@@ -130,7 +166,7 @@ export function AIPathwayModal({ isOpen, onClose, draft, onApply, isLoading, tri
                 </Card>
               )}
 
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
                 {draft.days.map((day) => (
                   <DayCard key={day.day} day={day} date={getDateForDay(day.day)} />
                 ))}
@@ -141,13 +177,18 @@ export function AIPathwayModal({ isOpen, onClose, draft, onApply, isLoading, tri
 
         {draft && !isLoading && (
           <div
-            className="flex items-center justify-end gap-2 p-4 border-t"
-            style={{ borderColor: 'var(--color-border)' }}
+            className="flex items-center justify-end gap-3"
+            style={{ 
+              padding: 'var(--spacing-6)',
+              borderTop: '1px solid var(--color-border-subtle)',
+            }}
           >
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="tertiary" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={() => onApply(draft)}>Apply</Button>
+            <Button onClick={() => onApply(draft)}>
+              Apply to schedule
+            </Button>
           </div>
         )}
       </div>

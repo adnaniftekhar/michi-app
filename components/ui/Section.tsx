@@ -14,29 +14,34 @@ interface SectionProps {
 
 export function Section({ title, description, action, children, emptyState, isEmpty }: SectionProps) {
   return (
-    <section className="mb-8">
+    <section style={{ marginBottom: 'var(--spacing-8)' }}>
       <div
-        className="mb-4 pb-4 border-b flex items-start justify-between gap-4"
-        style={{ borderColor: 'var(--color-border)' }}
+        className="flex items-start justify-between gap-4"
+        style={{ 
+          marginBottom: 'var(--spacing-6)',
+          paddingBottom: 'var(--spacing-4)',
+          borderBottom: '1px solid var(--color-border-subtle)',
+        }}
       >
         <div>
           <h2
-            className="mb-1"
             style={{
               fontSize: 'var(--font-size-xl)',
               lineHeight: 'var(--line-height-tight)',
               fontWeight: 'var(--font-weight-semibold)',
               color: 'var(--color-text-primary)',
+              marginBottom: 'var(--spacing-1)',
             }}
           >
             {title}
           </h2>
           {description && (
             <p
-              className="text-sm mt-1"
               style={{
+                fontSize: 'var(--font-size-sm)',
                 color: 'var(--color-text-secondary)',
                 lineHeight: 'var(--line-height-normal)',
+                marginTop: 'var(--spacing-1)',
               }}
             >
               {description}
@@ -47,18 +52,20 @@ export function Section({ title, description, action, children, emptyState, isEm
       </div>
       {isEmpty && emptyState ? (
         <div
-          className="text-center py-12 px-4 rounded-lg"
+          className="text-center rounded-lg"
           style={{
             backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
+            border: '1px dashed var(--color-border)',
             borderRadius: 'var(--radius-card)',
+            padding: 'var(--spacing-12) var(--spacing-4)',
           }}
         >
           <p
-            className="mb-4"
             style={{
               color: 'var(--color-text-secondary)',
               fontSize: 'var(--font-size-base)',
+              lineHeight: 'var(--line-height-normal)',
+              marginBottom: 'var(--spacing-6)',
             }}
           >
             {emptyState.message}

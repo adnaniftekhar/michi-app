@@ -32,7 +32,13 @@ export default function RootLayout({
           <AppShell>
             <Header />
             <main style={{ flex: 1 }}>
-              <div className="container mx-auto px-4 py-8" style={{ maxWidth: '1100px' }}>
+              <div className="container mx-auto" style={{ 
+                maxWidth: '1100px',
+                paddingLeft: 'var(--spacing-4)',
+                paddingRight: 'var(--spacing-4)',
+                paddingTop: 'var(--spacing-8)',
+                paddingBottom: 'var(--spacing-8)',
+              }}>
                 {children}
               </div>
             </main>

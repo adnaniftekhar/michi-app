@@ -63,6 +63,13 @@ export function CreateLearnerModal({ isOpen, onClose, onSave }: CreateLearnerMod
 
   if (!isOpen) return null
 
+  // Put these helpers near the top of the file (or just above where you build the payload)
+  const REFLECTION_STYLE_VALUES = ['discussion', 'journal', 'artistic', 'analytical'] as const;
+  type ReflectionStyle = (typeof REFLECTION_STYLE_VALUES)[number];
+
+  const isReflectionStyle = (v: unknown): v is ReflectionStyle =>
+    typeof v === 'string' && (REFLECTION_STYLE_VALUES as readonly string[]).includes(v);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -103,12 +110,19 @@ export function CreateLearnerModal({ isOpen, onClose, onSave }: CreateLearnerMod
         learningGoals: formData.learningGoals,
         preferredArtifactTypes: formData.preferredArtifactTypes as any[],
       },
-      experientialProfile: {
-        preferredFieldExperiences: formData.preferredFieldExperiences,
-        reflectionStyle: formData.reflectionStyles[0] || 'journal', // Legacy
-        reflectionStyles: formData.reflectionStyles,
-        inquiryApproach: formData.inquiryApproach,
-      },
+      experientialProfile: (() => {
+        // ...later, right before you construct experientialProfile:
+        const reflectionStyles: ReflectionStyle[] = (formData.reflectionStyles ?? []).filter(isReflectionStyle);
+        const reflectionStyle: ReflectionStyle = reflectionStyles[0] ?? 'journal';
+        
+        // ...inside experientialProfile:
+        return {
+          preferredFieldExperiences: formData.preferredFieldExperiences,
+          reflectionStyle,          // Legacy single value
+          reflectionStyles,         // New array value
+          inquiryApproach: formData.inquiryApproach,
+        };
+      })(),
       socialPreferences: {
         collaborationNotes: formData.collaborationNotes || undefined,
       },
@@ -737,11 +751,11 @@ export function CreateLearnerModal({ isOpen, onClose, onSave }: CreateLearnerMod
                         Collaboration Preference
                       </label>
                       <div className="space-y-2">
-                        {[
-                          { value: 'prefer-solo', label: 'Prefer Solo', helper: 'Works best independently' },
-                          { value: 'prefer-with-others', label: 'Prefer With Others', helper: 'Thrives in group settings' },
-                          { value: 'either-works', label: 'Either Works', helper: 'Comfortable with both approaches' },
-                        ].map((option) => (
+                        {([
+                          { value: 'prefer-solo' as const, label: 'Prefer Solo', helper: 'Works best independently' },
+                          { value: 'prefer-with-others' as const, label: 'Prefer With Others', helper: 'Thrives in group settings' },
+                          { value: 'either-works' as const, label: 'Either Works', helper: 'Comfortable with both approaches' },
+                        ] as const).map((option) => (
                           <label
                             key={option.value}
                             className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2"

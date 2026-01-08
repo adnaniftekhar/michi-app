@@ -17,7 +17,7 @@ import { useDemoUser } from '@/contexts/DemoUserContext'
 import { getLearnerProfile } from '@/lib/learner-profiles'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { getUserSettings } from '@/lib/user-settings'
-import { detectActivityType, getActivityIconUrl, getActivityImageAlt } from '@/lib/activity-images'
+import { detectActivityType, getActivityIconUrl, getActivityImageAlt, getActivityIconFallback } from '@/lib/activity-images'
 
 interface ScheduleItineraryTabProps {
   trip: Trip
@@ -164,6 +164,7 @@ export function ScheduleItineraryTab({
       for (const block of day.scheduleBlocks) {
         const blockDate = new Date(block.startTime)
         const activityType = detectActivityType(block.title, block.description, day.fieldExperience)
+        const activityLocation = day.fieldExperience ? trip.baseLocation : undefined
         
         newBlocks.push({
           id: `ai-${trip.id}-day${day.day}-${blockIndex}-${Date.now()}`,
@@ -173,7 +174,7 @@ export function ScheduleItineraryTab({
           title: block.title,
           description: block.description,
           // Incorporate field experience into schedule block
-          location: day.fieldExperience ? trip.baseLocation : undefined,
+          location: activityLocation,
           notes: day.fieldExperience ? `${day.fieldExperience}\n\n${day.inquiryTask}\n\nArtifact: ${day.artifact}` : undefined,
           isGenerated: true,
           createdAt: now,
@@ -184,8 +185,8 @@ export function ScheduleItineraryTab({
           reflectionPrompt: day.reflectionPrompt,
           critiqueStep: day.critiqueStep,
           // Add images/maps if enabled
-          imageUrl: options?.includeImages ? getActivityIconUrl(activityType) : undefined,
-          imageAlt: options?.includeImages ? getActivityImageAlt(activityType, block.title, day.fieldExperience) : undefined,
+          imageUrl: options?.includeImages ? getActivityIconUrl(activityType, activityLocation) : undefined,
+          imageAlt: options?.includeImages ? getActivityImageAlt(activityType, block.title, activityLocation) : undefined,
         })
         blockIndex++
       }
@@ -300,7 +301,7 @@ export function ScheduleItineraryTab({
                       {/* Activity Image */}
                       {showImagesAndMaps && (() => {
                         const activityType = detectActivityType(block.title, block.description, block.fieldExperience)
-                        const imageUrl = block.imageUrl || getActivityIconUrl(activityType)
+                        const imageUrl = block.imageUrl || getActivityIconUrl(activityType, block.location)
                         const imageAlt = block.imageAlt || getActivityImageAlt(activityType, block.title, block.location)
                         
                         return (
@@ -327,9 +328,9 @@ export function ScheduleItineraryTab({
                                 objectFit: 'cover',
                               }}
                               onError={(e) => {
-                                // Fallback to icon if image fails
+                                // Fallback to SVG icon if image fails
                                 const target = e.currentTarget
-                                target.src = getActivityIconUrl(activityType)
+                                target.src = getActivityIconFallback(activityType)
                               }}
                             />
                           </div>

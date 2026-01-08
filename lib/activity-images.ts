@@ -37,12 +37,38 @@ export function detectActivityType(title: string, description?: string, fieldExp
 }
 
 /**
- * Gets a generic icon URL for an activity type
- * Uses simple SVG data URLs or icon libraries
+ * Gets an image URL for an activity type
+ * Uses Picsum Photos for high-quality placeholder images (royalty-free, no API key)
+ * Images are generic and don't contain identifiable faces
  */
-export function getActivityIconUrl(activityType: ActivityType): string {
-  // Using simple SVG data URLs for generic icons
-  const icons: Record<ActivityType, string> = {
+export function getActivityIconUrl(activityType: ActivityType, location?: string): string {
+  // Use Picsum Photos - reliable, royalty-free placeholder images
+  // Each activity type gets a consistent image based on a seed number
+  const imageSeeds: Record<ActivityType, number> = {
+    museum: 101,
+    nature: 102,
+    market: 103,
+    historical: 104,
+    cultural: 105,
+    lab: 106,
+    workshop: 107,
+    reading: 108,
+    discussion: 109,
+    reflection: 110,
+    default: 111,
+  }
+
+  const seed = imageSeeds[activityType] || imageSeeds.default
+  // Picsum Photos: 400x400 size, grayscale for more neutral appearance
+  // Using seed ensures consistent image per activity type
+  return `https://picsum.photos/seed/${seed}${location ? location.replace(/\s+/g, '') : ''}/400/400`
+}
+
+/**
+ * Gets SVG fallback icon (used when image fails to load)
+ */
+export function getActivityIconFallback(activityType: ActivityType): string {
+  const fallbackIcons: Record<ActivityType, string> = {
     museum: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMlYyMk0xMiAyTDIwIDhIMTJWMjJNMTIgMkw0IDhIMTJWMjJNMTIgMkwyMCA4SDQuMDAwMDFMMTIgMloiIHN0cm9rZT0iIzZGRkJGOUEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+',
     nature: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkwxNyA3TDEyIDEyTDcgN0wxMiAyWk0xMiAxMkwxNyAxN0wxMiAyMkw3IDE3TDEyIDEyWiIgc3Ryb2tlPSIjNkZCRkE5QSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=',
     market: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNOCA2SDE2TTggMTBIMTZNOCAxNEgxNk04IDJIMjJWMjJIOFYyWiIgc3Ryb2tlPSIjNkZCRkE5QSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=',
@@ -56,7 +82,7 @@ export function getActivityIconUrl(activityType: ActivityType): string {
     default: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkMxNy41IDIgMjIgNi41IDIyIDEyQzIyIDE3LjUgMTcuNSAyMiAxMiAyMkM2LjUgMjIgMiAxNy41IDIgMTJDMiA2LjUgNi41IDIgMTIgMloiIHN0cm9rZT0iIzZGRkJGOUEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+',
   }
   
-  return icons[activityType] || icons.default
+  return fallbackIcons[activityType] || fallbackIcons.default
 }
 
 /**

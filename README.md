@@ -164,11 +164,37 @@ Data structure:
 
 ## Important Notes
 
-- **No backend**: This is Phase 1 only - all data is client-side
-- **No API routes**: Everything runs in the browser
+- **Backend**: Uses Next.js API routes for AI pathway generation
+- **Google Cloud**: Integrated with Vertex AI (Gemini) for learning pathway generation
+- **Storage**: localStorage for user data (client-side)
 - **No authentication**: Demo user switcher is just for data isolation
-- **No database**: localStorage only
 - **Phase 2** (Postgres/Prisma) is NOT implemented - will be added only when explicitly requested
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+### Quick Deploy Options:
+
+**Option 1: Vercel (Easiest)**
+1. Push code to GitHub
+2. Go to [vercel.com](https://vercel.com) → Import Project
+3. Add environment variables (see DEPLOYMENT.md)
+4. Deploy!
+
+**Option 2: Google Cloud Run**
+- Uses Dockerfile included in repo
+- Automatically authenticates with Google Cloud
+- See `.github/workflows/cloud-run.yml` for CI/CD
+
+### Testing Google Cloud Connection
+
+Test the AI API locally:
+```bash
+npm run dev
+# Visit http://localhost:3000/api/ai-test
+# Should return {"text":"OK"}
+```
 
 ## Troubleshooting
 

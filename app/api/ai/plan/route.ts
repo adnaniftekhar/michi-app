@@ -37,8 +37,8 @@ export async function POST(request: Request) {
 
     // Initialize Vertex AI
     const vertex = new VertexAI({
-      project: 'worldschool-mvp',
-      location: 'us-central1',
+      project: process.env.GOOGLE_CLOUD_PROJECT || 'worldschool-mvp',
+      location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
     })
 
     const model = vertex.getGenerativeModel({

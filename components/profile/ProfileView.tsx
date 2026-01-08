@@ -1,9 +1,12 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import type { LearnerProfile } from '@/types'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { InfoIcon } from '@/components/ui/Tooltip'
 import { detectTimezone, durationToMinutes, interactionStyleToPreference } from '@/lib/profile/utils'
+import { getUserSettings, updateUserSettings } from '@/lib/user-settings'
 
 interface ProfileViewProps {
   profile: LearnerProfile
@@ -13,6 +16,18 @@ export function ProfileView({ profile }: ProfileViewProps) {
   const detectedTz = typeof window !== 'undefined' ? detectTimezone() : profile.timezone
   const sessionMinutes = (profile.preferences as any).preferredDurationMinutes || durationToMinutes(profile.preferences.preferredDuration)
   const interactionPref = (profile.preferences as any).interactionPreference || interactionStyleToPreference(profile.preferences.interactionStyle)
+  const [showImagesAndMaps, setShowImagesAndMaps] = useState(true)
+
+  useEffect(() => {
+    const settings = getUserSettings()
+    setShowImagesAndMaps(settings.showImagesAndMaps)
+  }, [])
+
+  const handleToggleImagesAndMaps = () => {
+    const newValue = !showImagesAndMaps
+    setShowImagesAndMaps(newValue)
+    updateUserSettings({ showImagesAndMaps: newValue })
+  }
   
   const interactionLabels: Record<string, string> = {
     'prefer-solo': 'Prefer Solo',
@@ -174,8 +189,12 @@ export function ProfileView({ profile }: ProfileViewProps) {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <div className="text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+              <div className="text-sm mb-1 flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
                 Current Level
+                <InfoIcon
+                  tooltipContent="Beginner: new to the topic; Intermediate: some familiarity; Advanced: comfortable exploring complex ideas. This level affects the complexity of suggested activities."
+                  aria-label="Information about Current Level"
+                />
               </div>
               <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 {profile.pblProfile.currentLevel.charAt(0).toUpperCase() + profile.pblProfile.currentLevel.slice(1)}
@@ -233,8 +252,12 @@ export function ProfileView({ profile }: ProfileViewProps) {
         </h3>
         <div className="space-y-4">
           <div>
-            <div className="text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <div className="text-sm mb-2 flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
               Preferred Artifact Types
+              <InfoIcon
+                tooltipContent="Written artifacts include journals and essays; Visual artifacts include drawings and photos; Audio artifacts include recordings and podcasts; Multimedia combines multiple formats."
+                aria-label="Information about Preferred Artifact Types"
+              />
             </div>
             <div className="flex flex-wrap gap-2">
               {profile.pblProfile.preferredArtifactTypes.map((type) => (
@@ -245,8 +268,12 @@ export function ProfileView({ profile }: ProfileViewProps) {
             </div>
           </div>
           <div>
-            <div className="text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <div className="text-sm mb-2 flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
               Reflection Styles
+              <InfoIcon
+                tooltipContent="Journal: written reflections; Discussion: talking through ideas; Artistic: creative expression; Analytical: structured analysis. Choose styles that align with your child's preferences."
+                aria-label="Information about Reflection Styles"
+              />
             </div>
             <div className="flex flex-wrap gap-2">
               {((profile.experientialProfile as any).reflectionStyles || [profile.experientialProfile.reflectionStyle]).map((style: string) => (
@@ -257,8 +284,12 @@ export function ProfileView({ profile }: ProfileViewProps) {
             </div>
           </div>
           <div>
-            <div className="text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <div className="text-sm mb-1 flex items-center" style={{ color: 'var(--color-text-secondary)' }}>
               Inquiry Approach
+              <InfoIcon
+                tooltipContent="Structured: guided activities with clear steps; Guided: some structure with flexibility; Open-ended: more exploratory learning. This affects how learning tasks are designed."
+                aria-label="Information about Inquiry Approach"
+              />
             </div>
             <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
               {profile.experientialProfile.inquiryApproach.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -298,6 +329,54 @@ export function ProfileView({ profile }: ProfileViewProps) {
               </div>
             </div>
           )}
+        </div>
+      </Card>
+
+      {/* Settings */}
+      <Card>
+        <h3
+          className="font-semibold mb-4"
+          style={{
+            fontSize: 'var(--font-size-lg)',
+            lineHeight: 'var(--line-height-tight)',
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          Display Settings
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm mb-1" style={{ color: 'var(--color-text-primary)' }}>
+                Show images and maps
+              </div>
+              <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                Display activity images and map icons in learning pathways
+              </div>
+            </div>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showImagesAndMaps}
+                onChange={handleToggleImagesAndMaps}
+                className="sr-only"
+              />
+              <div
+                className="relative w-11 h-6 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{
+                  backgroundColor: showImagesAndMaps ? 'var(--color-michi-green)' : 'var(--color-border)',
+                  outlineColor: 'var(--color-focus-ring)',
+                }}
+              >
+                <div
+                  className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform bg-white"
+                  style={{
+                    transform: showImagesAndMaps ? 'translateX(20px)' : 'translateX(0)',
+                  }}
+                />
+              </div>
+            </label>
+          </div>
         </div>
       </Card>
     </div>

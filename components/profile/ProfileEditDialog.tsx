@@ -11,6 +11,7 @@ import { TimezoneCombobox } from './inputs/TimezoneCombobox'
 import { SessionLengthSlider } from './inputs/SessionLengthSlider'
 import { detectTimezone, durationToMinutes, minutesToDuration, interactionStyleToPreference, preferenceToInteractionStyle } from '@/lib/profile/utils'
 import { Badge } from '@/components/ui/Badge'
+import { InfoIcon } from '@/components/ui/Tooltip'
 
 interface ProfileEditDialogProps {
   isOpen: boolean
@@ -467,8 +468,22 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
                       helperText="AI will avoid suggesting activities related to these."
                     />
                     <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label
+                          className="block font-medium"
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          Current Level
+                        </label>
+                        <InfoIcon
+                          tooltipContent="Beginner: new to the topic; Intermediate: some familiarity; Advanced: comfortable exploring complex ideas. This level affects the complexity of suggested activities."
+                          aria-label="Information about Current Level"
+                        />
+                      </div>
                       <Select
-                        label="Current Level"
                         value={watch('currentLevel')}
                         onChange={(e) => setValue('currentLevel', e.target.value as any)}
                         options={[
@@ -571,15 +586,21 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
                   </h3>
                   <div className="space-y-6">
                     <div>
-                      <label
-                        className="block mb-2 font-medium"
-                        style={{
-                          fontSize: 'var(--font-size-sm)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        Preferred Artifact Types
-                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label
+                          className="block font-medium"
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          Preferred Artifact Types
+                        </label>
+                        <InfoIcon
+                          tooltipContent="Written artifacts include journals and essays; Visual artifacts include drawings and photos; Audio artifacts include recordings and podcasts; Multimedia combines multiple formats."
+                          aria-label="Information about Preferred Artifact Types"
+                        />
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {['written', 'visual', 'audio', 'multimedia'].map((type) => (
                           <button
@@ -613,15 +634,21 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
                       </p>
                     </div>
                     <div>
-                      <label
-                        className="block mb-2 font-medium"
-                        style={{
-                          fontSize: 'var(--font-size-sm)',
-                          color: 'var(--color-text-primary)',
-                        }}
-                      >
-                        Reflection Styles
-                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label
+                          className="block font-medium"
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          Reflection Styles
+                        </label>
+                        <InfoIcon
+                          tooltipContent="Journal: written reflections; Discussion: talking through ideas; Artistic: creative expression; Analytical: structured analysis. Choose styles that align with your child's preferences."
+                          aria-label="Information about Reflection Styles"
+                        />
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {['journal', 'discussion', 'artistic', 'analytical'].map((style) => (
                           <button
@@ -655,8 +682,22 @@ export function ProfileEditDialog({ isOpen, onClose, profile, onSave }: ProfileE
                       </p>
                     </div>
                     <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <label
+                          className="block font-medium"
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          Inquiry Approach
+                        </label>
+                        <InfoIcon
+                          tooltipContent="Structured: guided activities with clear steps; Guided: some structure with flexibility; Open-ended: more exploratory learning. This affects how learning tasks are designed."
+                          aria-label="Information about Inquiry Approach"
+                        />
+                      </div>
                       <Select
-                        label="Inquiry Approach"
                         value={watch('inquiryApproach')}
                         onChange={(e) => setValue('inquiryApproach', e.target.value as any)}
                         options={[

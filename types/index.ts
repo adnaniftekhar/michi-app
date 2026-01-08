@@ -46,6 +46,9 @@ export interface ScheduleBlock {
   notes?: string // Additional notes (incorporated from itinerary)
   isGenerated: boolean // true if generated, false if manual
   createdAt: string
+  // Visual elements
+  imageUrl?: string // URL to activity image or icon
+  imageAlt?: string // Alt text for accessibility
   // PBL fields (from AI pathway)
   drivingQuestion?: string
   fieldExperience?: string

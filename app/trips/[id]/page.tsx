@@ -26,6 +26,7 @@ import { ScheduleItineraryTab } from '@/components/trips/ScheduleItineraryTab'
 import { LogsTab } from '@/components/trips/LogsTab'
 import { TargetsTab } from '@/components/trips/TargetsTab'
 import { CreateTripForm } from '@/components/CreateTripForm'
+import { TripHeader } from '@/components/trips/TripHeader'
 
 export default function TripDetailPage() {
   const params = useParams()
@@ -120,15 +121,12 @@ export default function TripDetailPage() {
 
   return (
     <>
+      <TripHeader tripName={trip.title} />
       {isEditingTrip ? (
         <div className="mb-8">
           <PageHeader
             title="Edit Trip"
             subtitle="Update trip details"
-            breadcrumb={[
-              { label: 'Trips', href: '/' },
-              { label: trip.title, href: `/trips/${trip.id}` },
-            ]}
           />
           <CreateTripForm
             initialTrip={trip}
@@ -141,10 +139,6 @@ export default function TripDetailPage() {
           <PageHeader
             title={trip.title}
             subtitle={`${formatDateRange(trip.startDate, trip.endDate)} • ${trip.baseLocation} • ${timezoneLabel}`}
-            breadcrumb={[
-              { label: 'Trips', href: '/' },
-              { label: trip.title, href: `/trips/${trip.id}` },
-            ]}
             action={
               <Button variant="secondary" onClick={() => setIsEditingTrip(true)}>
                 Edit Trip

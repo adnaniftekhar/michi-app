@@ -72,6 +72,27 @@ export default function ProfilePage() {
         }
       />
 
+      <div
+        style={{
+          marginBottom: 'var(--spacing-6)',
+          padding: 'var(--spacing-4)',
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: 'var(--radius-card)',
+        }}
+      >
+        <p
+          style={{
+            fontSize: 'var(--font-size-base)',
+            lineHeight: 'var(--line-height-normal)',
+            color: 'var(--color-text-secondary)',
+            margin: 0,
+          }}
+        >
+          Look for the info icons (ℹ️) next to fields for definitions and examples. These tooltips help you understand how each setting influences the learning pathway.
+        </p>
+      </div>
+
       {profile && <ProfileView profile={profile} />}
 
       <ProfileEditDialog

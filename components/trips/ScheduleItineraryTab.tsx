@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Trip, ScheduleBlock } from '@/types'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -10,10 +10,13 @@ import { Section } from '../ui/Section'
 import { showToast } from '../ui/Toast'
 import { AIPathwayModal } from './AIPathwayModal'
 import { EditScheduleBlockModal } from './EditScheduleBlockModal'
+import { MapModal } from './MapModal'
 import type { AIPlanResponse } from '@/lib/ai-plan-schema'
 import { useDemoUser } from '@/contexts/DemoUserContext'
 import { getLearnerProfile } from '@/lib/learner-profiles'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { getUserSettings } from '@/lib/user-settings'
+import { detectActivityType, getActivityIconUrl, getActivityImageAlt } from '@/lib/activity-images'
 
 interface ScheduleItineraryTabProps {
   trip: Trip
@@ -36,6 +39,13 @@ export function ScheduleItineraryTab({
   const [aiDraft, setAiDraft] = useState<AIPlanResponse | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null)
+  const [mapModalLocation, setMapModalLocation] = useState<{ location: string; title: string } | null>(null)
+  const [showImagesAndMaps, setShowImagesAndMaps] = useState(true)
+
+  useEffect(() => {
+    const settings = getUserSettings()
+    setShowImagesAndMaps(settings.showImagesAndMaps)
+  }, [])
 
   // Only schedule blocks, sorted by date/time
   const sortedBlocks = [...scheduleBlocks].sort(
@@ -243,23 +253,63 @@ export function ScheduleItineraryTab({
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2" style={{ marginBottom: 'var(--spacing-2)' }}>
-                        {block.isGenerated && (
-                          <Badge variant="draft">Draft</Badge>
-                        )}
-                      </div>
-                      <h3
-                        style={{
-                          fontSize: 'var(--font-size-lg)',
-                          lineHeight: 'var(--line-height-tight)',
-                          fontWeight: 'var(--font-weight-semibold)',
-                          color: 'var(--color-text-primary)',
-                          marginBottom: 'var(--spacing-2)',
-                        }}
-                      >
-                        {block.title}
-                      </h3>
+                    <div className="flex-1 min-w-0 flex items-start gap-3">
+                      {/* Activity Image */}
+                      {showImagesAndMaps && (() => {
+                        const activityType = detectActivityType(block.title, block.description, block.fieldExperience)
+                        const imageUrl = block.imageUrl || getActivityIconUrl(activityType)
+                        const imageAlt = block.imageAlt || getActivityImageAlt(activityType, block.title, block.location)
+                        
+                        return (
+                          <div
+                            className="flex-shrink-0"
+                            style={{
+                              width: '64px',
+                              height: '64px',
+                              borderRadius: 'var(--radius-sm)',
+                              overflow: 'hidden',
+                              backgroundColor: 'var(--color-background)',
+                              border: '1px solid var(--color-border-subtle)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={imageAlt}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                              onError={(e) => {
+                                // Fallback to icon if image fails
+                                const target = e.currentTarget
+                                target.src = getActivityIconUrl(activityType)
+                              }}
+                            />
+                          </div>
+                        )
+                      })()}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2" style={{ marginBottom: 'var(--spacing-2)' }}>
+                          {block.isGenerated && (
+                            <Badge variant="draft">Draft</Badge>
+                          )}
+                        </div>
+                        <h3
+                          style={{
+                            fontSize: 'var(--font-size-lg)',
+                            lineHeight: 'var(--line-height-tight)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--color-text-primary)',
+                            marginBottom: 'var(--spacing-2)',
+                          }}
+                        >
+                          {block.title}
+                        </h3>
                       <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 'var(--font-size-sm)' }}>
                         <span style={{ color: 'var(--color-text-secondary)' }}>
                           {formatDate(block.startTime)}
@@ -282,7 +332,46 @@ export function ScheduleItineraryTab({
                         )}
                       </div>
                     </div>
+                    </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Map Icon */}
+                      {showImagesAndMaps && block.location && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMapModalLocation({ location: block.location!, title: block.title })
+                          }}
+                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
+                          style={{
+                            color: 'var(--color-text-secondary)',
+                            outlineColor: 'var(--color-focus-ring)',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          aria-label={`View map for ${block.location}`}
+                          title={`View map: ${block.location}`}
+                        >
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 18 18"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M9 1.5C6.1 1.5 3.75 3.85 3.75 6.75C3.75 10.5 9 16.5 9 16.5C9 16.5 14.25 10.5 14.25 6.75C14.25 3.85 11.9 1.5 9 1.5ZM9 9C8.17 9 7.5 8.33 7.5 7.5C7.5 6.67 8.17 6 9 6C9.83 6 10.5 6.67 10.5 7.5C10.5 8.33 9.83 9 9 9Z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                          </svg>
+                        </button>
+                      )}
                       {isExpanded && (
                         <>
                           <Button
@@ -664,6 +753,12 @@ export function ScheduleItineraryTab({
         onClose={() => setEditingBlock(null)}
         block={editingBlock}
         onSave={handleSaveBlock}
+      />
+      <MapModal
+        isOpen={!!mapModalLocation}
+        onClose={() => setMapModalLocation(null)}
+        location={mapModalLocation?.location || ''}
+        activityTitle={mapModalLocation?.title}
       />
     </>
   )

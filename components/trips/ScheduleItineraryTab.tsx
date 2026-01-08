@@ -11,6 +11,7 @@ import { showToast } from '../ui/Toast'
 import { AIPathwayModal } from './AIPathwayModal'
 import { EditScheduleBlockModal } from './EditScheduleBlockModal'
 import { MapModal } from './MapModal'
+import { LearningPathwayOptionsModal, type PathwayGenerationOptions } from './LearningPathwayOptionsModal'
 import type { AIPlanResponse } from '@/lib/ai-plan-schema'
 import { useDemoUser } from '@/contexts/DemoUserContext'
 import { getLearnerProfile } from '@/lib/learner-profiles'
@@ -35,12 +36,14 @@ export function ScheduleItineraryTab({
 }: ScheduleItineraryTabProps) {
   const { currentUserId } = useDemoUser()
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
+  const [showOptionsModal, setShowOptionsModal] = useState(false)
   const [showAIModal, setShowAIModal] = useState(false)
   const [aiDraft, setAiDraft] = useState<AIPlanResponse | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null)
   const [mapModalLocation, setMapModalLocation] = useState<{ location: string; title: string } | null>(null)
   const [showImagesAndMaps, setShowImagesAndMaps] = useState(true)
+  const [generationOptions, setGenerationOptions] = useState<PathwayGenerationOptions | null>(null)
 
   useEffect(() => {
     const settings = getUserSettings()
@@ -73,27 +76,52 @@ export function ScheduleItineraryTab({
     })
   }
 
-  const handleGenerateAIPathway = async () => {
+  const handleGenerateAIPathwayClick = () => {
     if (!trip.learningTarget) {
       showToast('Please set a learning target first', 'error')
       return
     }
+    setShowOptionsModal(true)
+  }
 
+  const handleGenerateWithOptions = async (options: PathwayGenerationOptions) => {
+    setShowOptionsModal(false)
     setIsGenerating(true)
     setShowAIModal(true)
     setAiDraft(null)
+    setGenerationOptions(options)
 
     try {
       const learnerProfile = getLearnerProfile(currentUserId)
+      
+      // Merge profile overrides
+      const mergedProfile = {
+        ...learnerProfile,
+        pblProfile: {
+          ...learnerProfile.pblProfile,
+          currentLevel: options.profileOverrides.currentLevel || learnerProfile.pblProfile.currentLevel,
+          preferredArtifactTypes: options.profileOverrides.preferredArtifactTypes || learnerProfile.pblProfile.preferredArtifactTypes,
+        },
+        experientialProfile: {
+          ...learnerProfile.experientialProfile,
+          reflectionStyle: options.profileOverrides.reflectionStyle || learnerProfile.experientialProfile.reflectionStyle,
+        },
+      }
+
+      const learningTarget: LearningTarget = {
+        track: options.effortTrack,
+        weeklyHours: options.weeklyHours,
+      }
       
       const response = await fetch('/api/ai/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           learnerProfileId: currentUserId,
-          learnerProfile,
+          learnerProfile: mergedProfile,
           trip,
-          learningTarget: trip.learningTarget,
+          learningTarget,
+          generationOptions: options,
         }),
       })
 
@@ -121,10 +149,22 @@ export function ScheduleItineraryTab({
     let blockIndex = 0
 
     const startDate = new Date(trip.startDate)
+    const options = generationOptions
 
     for (const day of draft.days) {
+      // Check if this day should be included based on selected days
+      const dayDate = new Date(startDate)
+      dayDate.setDate(startDate.getDate() + (day.day - 1))
+      const dayDateString = dayDate.toISOString().split('T')[0]
+      
+      if (options && !options.selectedDays.includes(dayDateString)) {
+        continue // Skip days not in selected range
+      }
+
       for (const block of day.scheduleBlocks) {
         const blockDate = new Date(block.startTime)
+        const activityType = detectActivityType(block.title, block.description, day.fieldExperience)
+        
         newBlocks.push({
           id: `ai-${trip.id}-day${day.day}-${blockIndex}-${Date.now()}`,
           date: blockDate.toISOString().split('T')[0],
@@ -143,6 +183,9 @@ export function ScheduleItineraryTab({
           artifact: day.artifact,
           reflectionPrompt: day.reflectionPrompt,
           critiqueStep: day.critiqueStep,
+          // Add images/maps if enabled
+          imageUrl: options?.includeImages ? getActivityIconUrl(activityType) : undefined,
+          imageAlt: options?.includeImages ? getActivityImageAlt(activityType, block.title, day.fieldExperience) : undefined,
         })
         blockIndex++
       }
@@ -221,7 +264,7 @@ export function ScheduleItineraryTab({
         description={`Your learning schedule (${timezone})`}
         action={
           trip.learningTarget ? (
-            <Button onClick={handleGenerateAIPathway} disabled={isGenerating} isLoading={isGenerating}>
+            <Button onClick={handleGenerateAIPathwayClick} disabled={isGenerating} isLoading={isGenerating}>
               {isGenerating ? 'Generating pathway...' : 'Generate learning pathway'}
             </Button>
           ) : (
@@ -759,6 +802,14 @@ export function ScheduleItineraryTab({
         onClose={() => setMapModalLocation(null)}
         location={mapModalLocation?.location || ''}
         activityTitle={mapModalLocation?.title}
+      />
+      <LearningPathwayOptionsModal
+        isOpen={showOptionsModal}
+        onClose={() => setShowOptionsModal(false)}
+        onGenerate={handleGenerateWithOptions}
+        trip={trip}
+        learnerProfile={getLearnerProfile(currentUserId)}
+        defaultLearningTarget={trip.learningTarget}
       />
     </>
   )

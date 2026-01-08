@@ -7,7 +7,7 @@ import type { Trip, LearningTarget, ItineraryItem } from '@/types'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { learnerProfileId, learnerProfile, trip, learningTarget, existingItinerary } = body
+    const { learnerProfileId, learnerProfile, trip, learningTarget, existingItinerary, generationOptions } = body
 
     // Validate required fields - either learnerProfile or learnerProfileId must be provided
     if ((!learnerProfile && !learnerProfileId) || !trip || !learningTarget) {
@@ -45,15 +45,23 @@ export async function POST(request: Request) {
       model: 'gemini-2.0-flash',
     })
 
-    // Calculate actual trip duration in days
-    const startDate = new Date(trip.startDate)
-    const endDate = new Date(trip.endDate)
-    const numDays = Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1
+    // Calculate actual trip duration in days based on selected days or full trip
+    let numDays: number
+    let selectedDays: string[] = []
+    
+    if (generationOptions?.selectedDays && generationOptions.selectedDays.length > 0) {
+      selectedDays = generationOptions.selectedDays
+      numDays = selectedDays.length
+    } else {
+      const startDate = new Date(trip.startDate)
+      const endDate = new Date(trip.endDate)
+      numDays = Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1
+    }
 
     // Build prompt for PBL-aligned learning pathway
-    const prompt = buildPlanPrompt(profile, trip, learningTarget, existingItinerary || [], numDays)
+    const prompt = buildPlanPrompt(profile, trip, learningTarget, existingItinerary || [], numDays, generationOptions)
 
     const result = await model.generateContent({
       contents: [
@@ -90,7 +98,20 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json(validationResult.data)
+    // Filter days if generation options specify selected days
+    let finalResponse = validationResult.data
+    if (generationOptions?.selectedDays && generationOptions.selectedDays.length > 0) {
+      const startDate = new Date(trip.startDate)
+      const filteredDays = finalResponse.days.filter((day: any) => {
+        const dayDate = new Date(startDate)
+        dayDate.setDate(startDate.getDate() + (day.day - 1))
+        const dayDateString = dayDate.toISOString().split('T')[0]
+        return generationOptions.selectedDays.includes(dayDateString)
+      })
+      finalResponse = { ...finalResponse, days: filteredDays }
+    }
+
+    return NextResponse.json(finalResponse)
   } catch (error) {
     console.error('AI plan generation error:', error)
     return NextResponse.json(
@@ -105,7 +126,8 @@ function buildPlanPrompt(
   trip: Trip,
   learningTarget: LearningTarget,
   existingItinerary: ItineraryItem[],
-  numDays: number
+  numDays: number,
+  generationOptions?: any
 ): string {
   return `You are a PBL (Project-Based Learning) expert designing a ${numDays}-day experiential learning pathway.
 

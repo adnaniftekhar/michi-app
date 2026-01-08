@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { Trip, ScheduleBlock } from '@/types'
+import type { Trip, ScheduleBlock, LearningTarget } from '@/types'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'

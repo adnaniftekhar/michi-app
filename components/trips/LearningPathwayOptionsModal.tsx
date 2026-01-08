@@ -518,10 +518,9 @@ export function LearningPathwayOptionsModal({
                       type="button"
                       onClick={() => {
                         // Toggle between artifact types
-                        const types: LearnerProfile['pblProfile']['preferredArtifactTypes'] = ['written', 'visual', 'audio', 'multimedia']
                         const current = profileOverrides.preferredArtifactTypes || learnerProfile.pblProfile.preferredArtifactTypes
                         // Simple toggle: if written, switch to visual; otherwise switch to written
-                        const newTypes = current.includes('written') 
+                        const newTypes: LearnerProfile['pblProfile']['preferredArtifactTypes'] = current.includes('written') 
                           ? ['visual'] 
                           : ['written']
                         setProfileOverrides({ ...profileOverrides, preferredArtifactTypes: newTypes })

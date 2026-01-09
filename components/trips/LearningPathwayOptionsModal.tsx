@@ -9,12 +9,14 @@ import { getUserSettings } from '@/lib/user-settings'
 
 export type GenerationMode = 'entire-trip' | 'day-by-day' | 'custom-range'
 
+export type ImageMode = 'off' | 'google' | 'ai'
+
 export interface PathwayGenerationOptions {
   generationMode: GenerationMode
   selectedDays: string[] // ISO date strings
   effortTrack: LearningTarget['track']
   weeklyHours?: number
-  includeImages: boolean
+  imageMode: ImageMode // 'off' | 'google' | 'ai'
   includeMaps: boolean
   profileOverrides: {
     currentLevel?: LearnerProfile['pblProfile']['currentLevel']
@@ -64,7 +66,7 @@ export function LearningPathwayOptionsModal({
     defaultLearningTarget?.track || '15min'
   )
   const [weeklyHours, setWeeklyHours] = useState<number>(defaultLearningTarget?.weeklyHours || 0)
-  const [includeImages, setIncludeImages] = useState(userSettings.showImagesAndMaps)
+  const [imageMode, setImageMode] = useState<ImageMode>(userSettings.showImagesAndMaps ? 'google' : 'off')
   const [includeMaps, setIncludeMaps] = useState(userSettings.showImagesAndMaps)
   const [profileOverrides, setProfileOverrides] = useState<PathwayGenerationOptions['profileOverrides']>({})
 
@@ -132,7 +134,7 @@ export function LearningPathwayOptionsModal({
       selectedDays: selectedDays.sort(),
       effortTrack,
       weeklyHours: effortTrack === 'weekly' ? weeklyHours : undefined,
-      includeImages,
+      imageMode,
       includeMaps,
       profileOverrides,
     }
@@ -404,42 +406,78 @@ export function LearningPathwayOptionsModal({
               </div>
             </Section>
 
-            {/* Visual Content Toggles */}
+            {/* Visual Content */}
             <Section title="Visual Content">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)', marginBottom: 'var(--spacing-1)' }}>
-                      Include images
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                      Each activity will display a representative image with alt text
-                    </div>
+                {/* Image Mode Selection */}
+                <div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-3)' }}>
+                    Images
                   </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeImages}
-                      onChange={(e) => setIncludeImages(e.target.checked)}
-                      className="sr-only"
-                    />
-                    <div
-                      className="relative w-11 h-6 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      style={{
-                        backgroundColor: includeImages ? 'var(--color-michi-green)' : 'var(--color-border)',
-                        outlineColor: 'var(--color-focus-ring)',
-                      }}
-                    >
-                      <div
-                        className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform bg-white"
-                        style={{
-                          transform: includeImages ? 'translateX(20px)' : 'translateX(0)',
-                        }}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imageMode"
+                        value="off"
+                        checked={imageMode === 'off'}
+                        onChange={(e) => setImageMode(e.target.value as ImageMode)}
+                        className="mt-1"
+                        style={{ accentColor: 'var(--color-michi-green)' }}
                       />
-                    </div>
-                  </label>
+                      <div className="flex-1">
+                        <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
+                          Off
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-1)' }}>
+                          No images displayed
+                        </div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imageMode"
+                        value="google"
+                        checked={imageMode === 'google'}
+                        onChange={(e) => setImageMode(e.target.value as ImageMode)}
+                        className="mt-1"
+                        style={{ accentColor: 'var(--color-michi-green)' }}
+                      />
+                      <div className="flex-1">
+                        <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
+                          Google place photos
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-1)' }}>
+                          Use photos from Google Places with attribution
+                        </div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imageMode"
+                        value="ai"
+                        checked={imageMode === 'ai'}
+                        onChange={(e) => setImageMode(e.target.value as ImageMode)}
+                        className="mt-1"
+                        style={{ accentColor: 'var(--color-michi-green)' }}
+                      />
+                      <div className="flex-1">
+                        <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
+                          AI illustrations
+                        </div>
+                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--spacing-1)' }}>
+                          Generate safe, generic illustrations (no faces)
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
+                {/* Maps Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)', marginBottom: 'var(--spacing-1)' }}>

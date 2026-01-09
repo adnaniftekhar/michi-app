@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 
 interface MapModalProps {
@@ -8,6 +8,7 @@ interface MapModalProps {
   onClose: () => void
   location: string
   activityTitle?: string
+  coordinates?: { lat: number; lng: number }
 }
 
 /**
@@ -36,43 +37,184 @@ function getStaticMapUrl(lat: number, lng: number, location: string): string {
   return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=12&size=600x400&markers=${lat},${lng},red`
 }
 
-export function MapModal({ isOpen, onClose, location, activityTitle }: MapModalProps) {
-  const [mapUrl, setMapUrl] = useState<string | null>(null)
+export function MapModal({ isOpen, onClose, location, activityTitle, coordinates: providedCoordinates }: MapModalProps) {
+  const mapContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const [map, setMap] = useState<google.maps.Map | null>(null)
+  const [marker, setMarker] = useState<google.maps.Marker | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
 
+  // Load Google Maps JavaScript API
   useEffect(() => {
-    if (isOpen && location) {
-      setIsLoading(true)
-      setHasError(false)
-      
-      // Try to get coordinates
-      getLocationCoordinates(location)
-        .then((coords) => {
-          if (coords) {
-            setCoordinates(coords)
-            const url = getStaticMapUrl(coords.lat, coords.lng, location)
-            setMapUrl(url)
-            setIsLoading(false)
-          } else {
-            // No coordinates available - show placeholder
-            setHasError(true)
-            setIsLoading(false)
-          }
-        })
-        .catch(() => {
+    if (typeof window === 'undefined') return
+
+    // Check if script is already loaded and API is ready
+    if (window.google?.maps && window.google.maps.Map) {
+      console.log('Google Maps API already loaded')
+      setMapsLoaded(true)
+      return
+    }
+
+    const script = document.createElement('script')
+    // Next.js exposes env vars prefixed with NEXT_PUBLIC_ to the client
+    const apiKey = process.env.NEXT_PUBLIC_MAPS_BROWSER_KEY || ''
+    
+    console.log('Maps API Key check:', {
+      hasKey: !!apiKey,
+      keyLength: apiKey.length,
+      keyPrefix: apiKey.substring(0, 10) + '...',
+    })
+    
+    if (!apiKey) {
+      console.error('NEXT_PUBLIC_MAPS_BROWSER_KEY is not set. Please add it to your .env.local file.')
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+    
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = () => {
+      // Wait a bit to ensure the API is fully initialized
+      setTimeout(() => {
+        if (window.google?.maps && window.google.maps.Map) {
+          console.log('Google Maps API loaded and ready')
+          setMapsLoaded(true)
+        } else {
+          console.error('Google Maps API loaded but Map constructor not available')
           setHasError(true)
           setIsLoading(false)
-        })
-    } else {
-      // Reset when modal closes
-      setMapUrl(null)
-      setCoordinates(null)
+        }
+      }, 100)
+    }
+    script.onerror = (error) => {
+      console.error('Failed to load Google Maps API:', error)
+      setHasError(true)
+      setIsLoading(false)
+    }
+    document.head.appendChild(script)
+
+    return () => {
+      // Cleanup: remove script if component unmounts
+      const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`)
+      if (existingScript) {
+        // Don't remove - might be used by other components
+      }
+    }
+  }, [])
+
+  // Initialize map when modal opens and Maps API is loaded
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset state when modal closes
+      setMap(null)
+      setMarker(null)
       setIsLoading(true)
       setHasError(false)
+      return
     }
-  }, [isOpen, location])
+    
+    if (!mapsLoaded) {
+      console.log('Waiting for Maps API to load...')
+      setIsLoading(true)
+      return
+    }
+    
+    const mapContainer = mapContainerRef.current
+    if (!mapContainer) {
+      console.warn('Map container ref not set')
+      setIsLoading(true)
+      return
+    }
+
+    const coords = providedCoordinates || null
+
+    if (!coords) {
+      console.warn('No coordinates provided for map:', { 
+        location, 
+        providedCoordinates,
+        hasCoordinates: !!providedCoordinates,
+        coordinatesValue: providedCoordinates
+      })
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+    
+    if (!coords.lat || !coords.lng || isNaN(coords.lat) || isNaN(coords.lng)) {
+      console.error('Invalid coordinates provided:', coords)
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+    
+    console.log('Initializing map with coordinates:', coords)
+
+    // Check if Google Maps API is actually loaded
+    if (!window.google || !window.google.maps || !window.google.maps.Map) {
+      console.error('Google Maps API not loaded yet', {
+        hasGoogle: !!window.google,
+        hasMaps: !!(window.google && window.google.maps),
+        hasMapConstructor: !!(window.google && window.google.maps && window.google.maps.Map),
+      })
+      setHasError(true)
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      // Initialize map
+      const newMap = new window.google.maps.Map(mapContainer, {
+        center: { lat: coords.lat, lng: coords.lng },
+        zoom: 12,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        styles: [
+          {
+            featureType: 'all',
+            elementType: 'geometry',
+            stylers: [{ color: '#1d1d1d' }],
+          },
+          {
+            featureType: 'all',
+            elementType: 'labels.text.fill',
+            stylers: [{ color: '#ffffff' }],
+          },
+        ],
+      })
+
+      // Add marker
+      const newMarker = new window.google.maps.Marker({
+        position: { lat: coords.lat, lng: coords.lng },
+        map: newMap,
+        title: activityTitle || location,
+        ariaLabel: `Location: ${location}`,
+      })
+
+      setMap(newMap)
+      setMarker(newMarker)
+      setIsLoading(false)
+      setHasError(false)
+    } catch (error) {
+      console.error('Error initializing map:', error)
+      setHasError(true)
+      setIsLoading(false)
+    }
+
+    return () => {
+      if (marker) {
+        marker.setMap(null)
+      }
+      if (map) {
+        // Map will be cleaned up by Google Maps API
+      }
+    }
+  }, [isOpen, mapsLoaded, providedCoordinates, location, activityTitle])
 
   if (!isOpen) return null
 
@@ -161,9 +303,8 @@ export function MapModal({ isOpen, onClose, location, activityTitle }: MapModalP
             justifyContent: 'center',
             minHeight: '400px',
             backgroundColor: 'var(--color-background)',
+            position: 'relative',
           }}
-          role="img"
-          aria-label={`Map showing location: ${location}`}
         >
           {isLoading && (
             <div style={{ color: 'var(--color-text-secondary)' }}>
@@ -194,27 +335,49 @@ export function MapModal({ isOpen, onClose, location, activityTitle }: MapModalP
                 style={{
                   fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-tertiary)',
+                  marginBottom: 'var(--spacing-2)',
                 }}
               >
                 Location: {location}
               </p>
+              {!providedCoordinates && (
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-tertiary)',
+                    marginTop: 'var(--spacing-2)',
+                  }}
+                >
+                  No coordinates available. Maps require location data from Places API.
+                </p>
+              )}
+              {providedCoordinates && (
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-tertiary)',
+                    marginTop: 'var(--spacing-2)',
+                  }}
+                >
+                  Coordinates: {providedCoordinates.lat.toFixed(4)}, {providedCoordinates.lng.toFixed(4)}
+                </p>
+              )}
             </div>
           )}
 
-          {mapUrl && !isLoading && !hasError && (
-            <img
-              src={mapUrl}
-              alt={`Map showing ${location}`}
+          {!hasError && (
+            <div
+              ref={mapContainerRef}
               style={{
                 width: '100%',
-                height: 'auto',
+                height: '400px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--color-border)',
+                overflow: 'hidden',
               }}
-              onError={() => {
-                setHasError(true)
-                setMapUrl(null)
-              }}
+              role="application"
+              aria-label={`Interactive map showing location: ${location}`}
+              tabIndex={0}
             />
           )}
         </div>

@@ -35,6 +35,13 @@ export interface ItineraryItem {
   createdAt: string
 }
 
+export type ImageMode = 'google' | 'ai' | 'off'
+
+export interface PhotoAttribution {
+  displayName: string
+  uri: string
+}
+
 export interface ScheduleBlock {
   id: string
   date: string // ISO date string
@@ -47,8 +54,20 @@ export interface ScheduleBlock {
   isGenerated: boolean // true if generated, false if manual
   createdAt: string
   // Visual elements
-  imageUrl?: string // URL to activity image or icon
+  imageUrl?: string // URL to activity image or icon (legacy/fallback)
   imageAlt?: string // Alt text for accessibility
+  // Google Places integration
+  placeId?: string // Google Places placeId
+  placeName?: string // Display name from Places API
+  approxLat?: number // City-level approximate latitude
+  approxLng?: number // City-level approximate longitude
+  imageMode?: ImageMode // 'google' | 'ai' | 'off'
+  photoName?: string // Google Places photo name (if imageMode=google)
+  photoAttribution?: PhotoAttribution // Photo attribution (if imageMode=google)
+  aiImageAssetId?: string // AI-generated image asset ID (if imageMode=ai)
+  aiImageUrl?: string // AI-generated image URL (if imageMode=ai)
+  // Coordinates for maps (city-level only for privacy)
+  coordinates?: { lat: number; lng: number } // Approximate coordinates for map
   // PBL fields (from AI pathway)
   drivingQuestion?: string
   fieldExperience?: string

@@ -36,14 +36,21 @@ export async function POST(request: Request) {
     }
 
     // Initialize Vertex AI
+    const project = process.env.GOOGLE_CLOUD_PROJECT || 'worldschool-mvp'
+    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
+    
+    console.log('Initializing Vertex AI:', { project, location })
+    
     const vertex = new VertexAI({
-      project: process.env.GOOGLE_CLOUD_PROJECT || 'worldschool-mvp',
-      location: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+      project,
+      location,
     })
 
     const model = vertex.getGenerativeModel({
       model: 'gemini-2.0-flash',
     })
+    
+    console.log('Vertex AI model initialized successfully')
 
     // Calculate actual trip duration in days based on selected days or full trip
     let numDays: number
@@ -62,6 +69,9 @@ export async function POST(request: Request) {
 
     // Build prompt for PBL-aligned learning pathway
     const prompt = buildPlanPrompt(profile, trip, learningTarget, existingItinerary || [], numDays, generationOptions)
+    
+    console.log('Calling Vertex AI with prompt length:', prompt.length, 'characters')
+    console.log('Number of days:', numDays)
 
     const result = await model.generateContent({
       contents: [
@@ -73,6 +83,9 @@ export async function POST(request: Request) {
     })
 
     const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    
+    console.log('AI response received, length:', responseText.length, 'characters')
+    console.log('AI response preview:', responseText.substring(0, 200))
 
     // Parse and validate JSON response
     let parsedResponse
@@ -98,24 +111,83 @@ export async function POST(request: Request) {
       )
     }
 
-    // Filter days if generation options specify selected days
+    // When selectedDays are provided, map AI's day numbers (1, 2, 3...) to actual selected dates
+    // The AI generates days numbered 1-N, but we need to map them to the actual selected dates
     let finalResponse = validationResult.data
     if (generationOptions?.selectedDays && generationOptions.selectedDays.length > 0) {
       const startDate = new Date(trip.startDate)
-      const filteredDays = finalResponse.days.filter((day: any) => {
-        const dayDate = new Date(startDate)
-        dayDate.setDate(startDate.getDate() + (day.day - 1))
-        const dayDateString = dayDate.toISOString().split('T')[0]
-        return generationOptions.selectedDays.includes(dayDateString)
+      const selectedDays = generationOptions.selectedDays.sort() // Sort to ensure consistent mapping
+      
+      console.log(`[AI Plan] Mapping AI days to selected dates:`, {
+        totalDaysGenerated: finalResponse.days.length,
+        selectedDays: selectedDays,
+        startDate: startDate.toISOString().split('T')[0],
       })
-      finalResponse = { ...finalResponse, days: filteredDays }
+      
+      // Map each AI-generated day (numbered 1, 2, 3...) to the corresponding selected date
+      // Day 1 -> first selected date, Day 2 -> second selected date, etc.
+      const mappedDays = finalResponse.days.map((day: any, index: number) => {
+        if (index < selectedDays.length) {
+          // Map day number to the actual selected date
+          const actualDate = selectedDays[index]
+          // Update the day number to match the actual date's position in the trip
+          const actualDayNumber = Math.floor(
+            (new Date(actualDate).getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+          ) + 1
+          
+          console.log(`[AI Plan] Mapping AI day ${day.day} (index ${index}) to actual date ${actualDate} (day ${actualDayNumber})`)
+          
+          return {
+            ...day,
+            day: actualDayNumber, // Update to the actual day number in the trip
+            _mappedDate: actualDate, // Store the actual date for reference
+          }
+        }
+        return day
+      }).filter((day: any, index: number) => index < selectedDays.length) // Only keep days that have a selected date
+      
+      console.log(`[AI Plan] Mapped ${mappedDays.length} days to selected dates`)
+      finalResponse = { ...finalResponse, days: mappedDays }
+    }
+
+    // Enrich with Places data if needed
+    // Always enrich if includeMaps is true, or if we have location data to resolve
+    if (generationOptions && (generationOptions.imageMode === 'google' || generationOptions.includeMaps || true)) {
+      try {
+        const { enrichActivitiesWithPlaces } = await import('@/lib/enrich-activities-with-places')
+        console.log('Enriching pathway with Places data...', {
+          imageMode: generationOptions.imageMode,
+          includeMaps: generationOptions.includeMaps,
+          tripBaseLocation: trip.baseLocation,
+        })
+        finalResponse = await enrichActivitiesWithPlaces(finalResponse, {
+          imageMode: generationOptions.imageMode || 'off',
+          includeMaps: generationOptions.includeMaps || false,
+          tripBaseLocation: trip.baseLocation,
+        })
+        console.log('Places enrichment completed')
+      } catch (error) {
+        console.error('Error enriching with Places data:', error)
+        console.error('Error details:', error instanceof Error ? error.stack : String(error))
+        // Continue without enrichment if it fails - don't break the whole request
+        // The pathway will still be generated, just without Places data
+      }
     }
 
     return NextResponse.json(finalResponse)
   } catch (error) {
     console.error('AI plan generation error:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : 'Unknown',
+    })
     return NextResponse.json(
-      { error: 'Failed to generate learning pathway', details: error instanceof Error ? error.message : String(error) },
+      { 
+        error: 'Failed to generate learning pathway', 
+        details: error instanceof Error ? error.message : String(error),
+        hint: 'Check server logs for more details. Common issues: Google Cloud authentication, API quota, or network connectivity.'
+      },
       { status: 500 }
     )
   }

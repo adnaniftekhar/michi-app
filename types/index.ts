@@ -75,6 +75,20 @@ export interface ScheduleBlock {
   artifact?: string
   reflectionPrompt?: string
   critiqueStep?: string
+  // Local venue suggestions
+  localOptions?: LocalVenueSuggestion[]
+}
+
+export interface LocalVenueSuggestion {
+  placeId: string
+  displayName: string
+  areaLabel: string // Neighborhood/city (privacy-safe)
+  googleMapsUri: string
+  websiteUri?: string
+  rating?: number
+  userRatingCount?: number
+  openNow?: boolean
+  location?: { lat: number; lng: number } // Optional coordinates for map preview
 }
 
 export type ArtifactType = 'LINK' | 'NOTE'
@@ -104,3 +118,56 @@ export interface AppData {
   activityLogs: Record<string, ActivityLog[]> // tripId -> logs
 }
 
+// Pathway Draft Types (2-stage generation)
+export type PathwayDraftType = 'continuous' | 'themes' | 'hybrid'
+
+export interface PathwayDraftDay {
+  day: number
+  date: string // ISO date string
+  headline: string // Brief headline for this day
+  summary?: string // Optional detailed summary for this day
+}
+
+export interface PathwayDraft {
+  id: string
+  type: PathwayDraftType
+  title: string
+  overview: string // Brief description of this pathway approach
+  whyItFits: string // Why this pathway fits the learner
+  rationale?: string // Optional rationale for this pathway approach
+  days: PathwayDraftDay[] // Day-by-day headlines for selected days
+}
+
+export interface PathwayDraftsResponse {
+  drafts: [PathwayDraft, PathwayDraft, PathwayDraft] // Exactly 3 drafts
+}
+
+export interface FinalizePathwayRequest {
+  tripId: string
+  learnerId: string
+  chosenDraftId: string
+  selectedDates: string[] // ISO date strings
+  effortMode: LearningTrack
+  editedDraft?: PathwayDraft // Optional edited draft to use instead of original
+}
+
+export interface FinalPathwayPlan {
+  days: Array<{
+    day: number
+    date: string // ISO date string
+    drivingQuestion: string
+    fieldExperience: string
+    inquiryTask: string
+    artifact: string
+    reflectionPrompt: string
+    critiqueStep: string
+    scheduleBlocks: Array<{
+      startTime: string // ISO datetime
+      duration: number // minutes
+      title: string
+      description?: string
+      localOptions?: LocalVenueSuggestion[]
+    }>
+  }>
+  summary?: string
+}

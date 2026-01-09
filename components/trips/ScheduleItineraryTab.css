@@ -1,0 +1,24 @@
+/* Responsive layout for Local Options section */
+.local-options-layout {
+  display: grid;
+  gap: var(--spacing-4);
+  align-items: start;
+}
+
+/* Desktop: Map on left (300px), venues on right (only if map exists) */
+@media (min-width: 768px) {
+  .local-options-layout[data-has-map='true'] {
+    grid-template-columns: 300px 1fr;
+  }
+  
+  .local-options-layout[data-has-map='false'] {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile: Always stack vertically */
+@media (max-width: 767px) {
+  .local-options-layout {
+    grid-template-columns: 1fr !important;
+  }
+}

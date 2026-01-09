@@ -120,8 +120,10 @@ Return ONLY a JSON array of 3-5 keyword strings. Example: ["museum interior", "a
           const apiKey = process.env.PLACES_API_KEY
 
           if (!apiKey) {
-            console.warn('PLACES_API_KEY not configured, skipping enrichment')
-            return block
+            console.error('⚠️ PLACES_API_KEY is missing! Maps and location coordinates will NOT be generated.')
+            // Return enriched block (with keywords) even if Places API is unavailable
+            // This ensures images still work even if location enrichment fails
+            return enrichedBlock
           }
 
           console.log(`Resolving location for block "${block.title}": ${locationQuery}`)

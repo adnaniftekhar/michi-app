@@ -7,10 +7,14 @@ const SETTINGS_KEY = 'michi_user_settings'
 
 export interface UserSettings {
   showImagesAndMaps: boolean
+  venueLinksEnabled: boolean
+  showExactAddresses: boolean
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
   showImagesAndMaps: true, // Default to enabled
+  venueLinksEnabled: true, // Default to enabled
+  showExactAddresses: false, // Default to OFF for privacy
 }
 
 export function getUserSettings(): UserSettings {

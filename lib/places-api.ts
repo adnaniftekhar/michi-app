@@ -225,3 +225,107 @@ export async function fetchPlacePhoto(
 
   return { data, contentType }
 }
+
+/**
+ * Search for nearby venues using Google Places API
+ * Returns venue suggestions with privacy-safe location data
+ */
+export interface PlaceSearchRequest {
+  query: string
+  near: { lat: number; lng: number }
+  radiusMeters?: number
+  maxResults?: number
+}
+
+export interface PlaceSuggestion {
+  placeId: string
+  displayName: string
+  areaLabel: string // Neighborhood/city (privacy-safe, no exact address)
+  googleMapsUri: string
+  websiteUri?: string
+  rating?: number
+  userRatingCount?: number
+  openNow?: boolean
+  location?: { lat: number; lng: number } // Optional coordinates for map preview
+}
+
+export async function searchPlaces(
+  request: PlaceSearchRequest,
+  apiKey: string,
+  showExactAddresses: boolean = false
+): Promise<PlaceSuggestion[]> {
+  const { query, near, radiusMeters = 5000, maxResults = 3 } = request
+
+  // Use Places API (New) Text Search with location bias
+  const url = `${PLACES_API_BASE}/places:searchText`
+  
+  const requestBody = {
+    textQuery: query,
+    maxResultCount: maxResults,
+    locationBias: {
+      circle: {
+        center: {
+          latitude: near.lat,
+          longitude: near.lng,
+        },
+        radius: radiusMeters,
+      },
+    },
+    // Note: includedType removed - textQuery already filters to relevant venues
+    // The query itself (e.g., "circus props shop Kyoto") is sufficient
+  }
+
+  console.log('Searching places:', { query, near, radiusMeters, maxResults })
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.websiteUri,places.currentOpeningHours,places.nationalPhoneNumber',
+    },
+    body: JSON.stringify(requestBody),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Places Search API error: ${response.status} - ${error}`)
+  }
+
+  const data = await response.json()
+  const places = data.places || []
+
+  // Transform to PlaceSuggestion format
+  const suggestions: PlaceSuggestion[] = places.map((place: any) => {
+    // Extract area label (privacy-safe: neighborhood or city, not exact address)
+    let areaLabel = place.formattedAddress || ''
+    if (!showExactAddresses && areaLabel) {
+      // Remove street address, keep city/neighborhood
+      // Format: "123 Main St, City, State" -> "City, State"
+      const parts = areaLabel.split(',')
+      if (parts.length >= 2) {
+        areaLabel = parts.slice(1).join(',').trim()
+      }
+    }
+
+    // Build Google Maps URI
+    const googleMapsUri = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.displayName?.text || query)}&query_place_id=${place.id}`
+
+    return {
+      placeId: place.id,
+      displayName: place.displayName?.text || query,
+      areaLabel,
+      googleMapsUri,
+      websiteUri: place.websiteUri,
+      rating: place.rating,
+      location: place.location ? {
+        lat: place.location.latitude,
+        lng: place.location.longitude,
+      } : undefined,
+      userRatingCount: place.userRatingCount,
+      openNow: place.currentOpeningHours?.openNow,
+    }
+  })
+
+  return suggestions
+}

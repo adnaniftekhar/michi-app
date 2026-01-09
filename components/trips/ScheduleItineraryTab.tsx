@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { Trip, ScheduleBlock, LearningTarget } from '@/types'
+import './ScheduleItineraryTab.css'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
@@ -12,7 +13,9 @@ import { AIPathwayModal } from './AIPathwayModal'
 import { EditScheduleBlockModal } from './EditScheduleBlockModal'
 import { MapModal } from './MapModal'
 import { LearningPathwayOptionsModal, type PathwayGenerationOptions } from './LearningPathwayOptionsModal'
+import { ChoosePathwayModal } from './ChoosePathwayModal'
 import type { AIPlanResponse } from '@/lib/ai-plan-schema'
+import type { FinalPathwayPlan } from '@/types'
 import { useDemoUser } from '@/contexts/DemoUserContext'
 import { getLearnerProfile } from '@/lib/learner-profiles'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
@@ -37,6 +40,7 @@ export function ScheduleItineraryTab({
   const { currentUserId } = useDemoUser()
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showOptionsModal, setShowOptionsModal] = useState(false)
+  const [showChoosePathwayModal, setShowChoosePathwayModal] = useState(false)
   const [showAIModal, setShowAIModal] = useState(false)
   const [aiDraft, setAiDraft] = useState<AIPlanResponse | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -47,7 +51,8 @@ export function ScheduleItineraryTab({
 
   useEffect(() => {
     const settings = getUserSettings()
-    setShowImagesAndMaps(settings.showImagesAndMaps)
+    // Default to TRUE if undefined (fixes disappearing images for new users)
+    setShowImagesAndMaps(settings.showImagesAndMaps ?? true)
   }, [])
 
   // Only schedule blocks, sorted by date/time
@@ -81,7 +86,8 @@ export function ScheduleItineraryTab({
       showToast('Please set a learning target first', 'error')
       return
     }
-    setShowOptionsModal(true)
+    // Use new 2-stage flow: Choose Pathway modal
+    setShowChoosePathwayModal(true)
   }
 
   const handleGenerateWithOptions = async (options: PathwayGenerationOptions) => {
@@ -141,6 +147,88 @@ export function ScheduleItineraryTab({
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleFinalizePathway = async (finalPlan: FinalPathwayPlan) => {
+    const newBlocks: ScheduleBlock[] = []
+    const now = new Date().toISOString()
+    let blockIndex = 0
+
+    console.log(`[handleFinalizePathway] START: Processing ${finalPlan.days.length} days`)
+
+    for (const day of finalPlan.days) {
+      const dayDate = new Date(day.date)
+      const dayDateString = dayDate.toISOString().split('T')[0]
+
+      console.log(`[handleFinalizePathway] Processing day ${day.day}`, {
+        date: dayDateString,
+        hasBlocks: day.scheduleBlocks.length,
+      })
+
+      if (day.scheduleBlocks.length === 0) {
+        console.warn(`[handleFinalizePathway] Day ${day.day} has no schedule blocks, skipping`)
+        continue
+      }
+
+      for (const block of day.scheduleBlocks) {
+        const blockDate = new Date(block.startTime)
+        const [datePart] = blockDate.toISOString().split('T')
+        const timePart = blockDate.toISOString().split('T')[1]
+        const updatedStartTime = `${dayDateString}T${timePart}`
+
+        const activityType = detectActivityType(block.title, block.description, day.fieldExperience)
+
+        // NO images/maps in this pass - just basic activity images
+        const imageUrl = getActivityIconUrl(activityType, `${block.title}-day${day.day}-block${blockIndex}`, new Set())
+        const imageAlt = getActivityImageAlt(activityType, block.title, undefined)
+
+        const newBlock: ScheduleBlock = {
+          id: `block-${now}-${blockIndex}`,
+          date: dayDateString,
+          startTime: updatedStartTime,
+          duration: block.duration,
+          title: block.title,
+          description: block.description,
+          isGenerated: true,
+          createdAt: now,
+          // PBL fields
+          drivingQuestion: day.drivingQuestion,
+          fieldExperience: day.fieldExperience,
+          inquiryTask: day.inquiryTask,
+          artifact: day.artifact,
+          reflectionPrompt: day.reflectionPrompt,
+          critiqueStep: day.critiqueStep,
+          // Basic image (no maps/places in this pass)
+          imageUrl,
+          imageAlt,
+          imageMode: 'off',
+          // Local venue suggestions
+          localOptions: block.localOptions,
+        }
+
+        newBlocks.push(newBlock)
+        blockIndex++
+      }
+    }
+
+    // Replace only previously generated blocks, keep manual ones
+    const manualBlocks = scheduleBlocks.filter((b) => !b.isGenerated)
+    const updated = [...manualBlocks, ...newBlocks]
+
+    console.log(`[handleFinalizePathway] FINAL RESULTS:`, {
+      daysCount: finalPlan.days.length,
+      newBlocksCount: newBlocks.length,
+      manualBlocksCount: manualBlocks.length,
+      totalBlocks: updated.length,
+    })
+
+    if (newBlocks.length === 0) {
+      showToast('No activities were generated. Please try again.', 'error')
+      return
+    }
+
+    onScheduleUpdate(updated)
+    showToast(`Added ${newBlocks.length} activities to your schedule`, 'success')
   }
 
   const handleApplyAIPathway = async (draft: AIPlanResponse) => {
@@ -538,10 +626,9 @@ export function ScheduleItineraryTab({
                             overflow: 'hidden',
                           }}
                           onError={(e) => {
-                            // If background image fails to load, fallback to solid color
+                            // If background image fails to load, use a nice gradient fallback
                             const target = e.currentTarget as HTMLDivElement
-                            target.style.backgroundImage = 'none'
-                            target.style.backgroundColor = 'var(--color-surface)'
+                            target.style.backgroundImage = 'linear-gradient(135deg, var(--color-surface-hover) 0%, var(--color-surface) 100%)'
                           }}
                         >
                           {/* Dark overlay for text readability */}
@@ -629,33 +716,22 @@ export function ScheduleItineraryTab({
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {/* Map Button - More Prominent */}
-                              {showImagesAndMaps && (block.location || block.coordinates || (block.approxLat && block.approxLng)) && (
+                              {/* Show map button if location exists (MapModal can resolve coordinates server-side) */}
+                              {showImagesAndMaps && block.location && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
+                                    // MapModal can resolve coordinates server-side if missing
+                                    // Pass coordinates if available, otherwise let MapModal resolve from location
                                     const coords = block.coordinates || (block.approxLat && block.approxLng 
                                       ? { lat: block.approxLat, lng: block.approxLng }
                                       : undefined)
                                     
-                                    console.log(`[Map Button] Clicked for "${block.title}":`, {
-                                      hasCoordinates: !!block.coordinates,
-                                      hasApproxLat: !!block.approxLat,
-                                      hasApproxLng: !!block.approxLng,
-                                      coordinates: block.coordinates,
-                                      approxLat: block.approxLat,
-                                      approxLng: block.approxLng,
-                                      finalCoords: coords,
-                                    })
-                                    
-                                    if (!coords) {
-                                      console.warn(`[Map Button] No coordinates available for "${block.title}"`)
-                                    }
-                                    
                                     setMapModalLocation({ 
                                       location: block.location || block.placeName || block.title,
                                       title: block.title,
-                                      coordinates: coords,
+                                      coordinates: coords, // Optional - MapModal will resolve if missing
                                     })
                                   }}
                                   className="flex items-center gap-2 px-3 py-2 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
@@ -868,91 +944,6 @@ export function ScheduleItineraryTab({
 
                           {/* Right Column: Logistics & Field Experience */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-5)' }}>
-                            {/* Map Preview */}
-                            {showImagesAndMaps && (block.coordinates || (block.approxLat && block.approxLng)) && (
-                              <div
-                                style={{
-                                  padding: 'var(--spacing-4)',
-                                  borderRadius: 'var(--radius-card)',
-                                  backgroundColor: 'var(--color-background)',
-                                  border: '1px solid var(--color-border-subtle)',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: 'var(--font-size-xs)',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
-                                    fontWeight: 'var(--font-weight-medium)',
-                                    color: 'var(--color-text-secondary)',
-                                    marginBottom: 'var(--spacing-3)',
-                                  }}
-                                >
-                                  Location
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    const coords = block.coordinates || (block.approxLat && block.approxLng 
-                                      ? { lat: block.approxLat, lng: block.approxLng }
-                                      : undefined)
-                                    setMapModalLocation({ 
-                                      location: block.location || block.placeName || block.title,
-                                      title: block.title,
-                                      coordinates: coords,
-                                    })
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    height: '200px',
-                                    borderRadius: 'var(--radius-sm)',
-                                    backgroundColor: 'var(--color-surface)',
-                                    border: '1px solid var(--color-border-subtle)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexDirection: 'column',
-                                    gap: 'var(--spacing-2)',
-                                    color: 'var(--color-text-secondary)',
-                                    transition: 'all 0.2s',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                                    e.currentTarget.style.borderColor = 'var(--color-michi-green)'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--color-surface)'
-                                    e.currentTarget.style.borderColor = 'var(--color-border-subtle)'
-                                  }}
-                                  aria-label={`View map for ${block.location || block.placeName || block.title}`}
-                                >
-                                  <svg
-                                    width="32"
-                                    height="32"
-                                    viewBox="0 0 18 18"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    style={{ opacity: 0.6 }}
-                                  >
-                                    <path
-                                      d="M9 1.5C6.1 1.5 3.75 3.85 3.75 6.75C3.75 10.5 9 16.5 9 16.5C9 16.5 14.25 10.5 14.25 6.75C14.25 3.85 11.9 1.5 9 1.5ZM9 9C8.17 9 7.5 8.33 7.5 7.5C7.5 6.67 8.17 6 9 6C9.83 6 10.5 6.67 10.5 7.5C10.5 8.33 9.83 9 9 9Z"
-                                      stroke="currentColor"
-                                      strokeWidth="1.5"
-                                      fill="none"
-                                    />
-                                  </svg>
-                                  <span style={{ fontSize: 'var(--font-size-sm)' }}>
-                                    {block.location || block.placeName || 'View on map'}
-                                  </span>
-                                  <span style={{ fontSize: 'var(--font-size-xs)', opacity: 0.7 }}>
-                                    Click to open interactive map
-                                  </span>
-                                </button>
-                              </div>
-                            )}
-                            
                             {block.description && (
                               <div
                                 style={{
@@ -1148,6 +1139,371 @@ export function ScheduleItineraryTab({
                             )}
                           </div>
                         </div>
+
+                        {/* Local Options Section - Full width below two columns */}
+                        {getUserSettings().venueLinksEnabled && (
+                          <div
+                            style={{
+                              marginTop: 'var(--spacing-6)',
+                              padding: 'var(--spacing-4)',
+                              borderRadius: 'var(--radius-card)',
+                              backgroundColor: 'var(--color-background)',
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 'var(--font-size-xs)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                fontWeight: 'var(--font-weight-medium)',
+                                color: 'var(--color-text-secondary)',
+                                marginBottom: 'var(--spacing-4)',
+                              }}
+                            >
+                              Local Options
+                            </div>
+
+                            <div
+                              className="local-options-layout"
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: showImagesAndMaps && block.location ? '300px 1fr' : '1fr',
+                                gap: 'var(--spacing-4)',
+                                alignItems: 'start',
+                              }}
+                              data-has-map={showImagesAndMaps && block.location ? 'true' : 'false'}
+                            >
+                              {/* Map Preview - Left side if location exists */}
+                              {showImagesAndMaps && block.location && (
+                                <div
+                                  style={{
+                                    borderRadius: 'var(--radius-sm)',
+                                    overflow: 'hidden',
+                                    border: '1px solid var(--color-border-subtle)',
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const coords = block.coordinates || (block.approxLat && block.approxLng 
+                                        ? { lat: block.approxLat, lng: block.approxLng }
+                                        : undefined)
+                                      setMapModalLocation({ 
+                                        location: block.location || block.placeName || block.title,
+                                        title: block.title,
+                                        coordinates: coords,
+                                      })
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      height: '200px',
+                                      backgroundColor: 'var(--color-surface)',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexDirection: 'column',
+                                      gap: 'var(--spacing-2)',
+                                      color: 'var(--color-text-secondary)',
+                                      transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'var(--color-surface)'
+                                    }}
+                                    aria-label={`View map for ${block.location || block.placeName || block.title}`}
+                                  >
+                                    <svg
+                                      width="32"
+                                      height="32"
+                                      viewBox="0 0 18 18"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      style={{ opacity: 0.6 }}
+                                    >
+                                      <path
+                                        d="M9 1.5C6.1 1.5 3.75 3.85 3.75 6.75C3.75 10.5 9 16.5 9 16.5C9 16.5 14.25 10.5 14.25 6.75C14.25 3.85 11.9 1.5 9 1.5ZM9 9C8.17 9 7.5 8.33 7.5 7.5C7.5 6.67 8.17 6 9 6C9.83 6 10.5 6.67 10.5 7.5C10.5 8.33 9.83 9 9 9Z"
+                                        stroke="currentColor"
+                                        strokeWidth="1.5"
+                                        fill="none"
+                                      />
+                                    </svg>
+                                    <span style={{ fontSize: 'var(--font-size-sm)' }}>
+                                      {block.location || block.placeName || 'View on map'}
+                                    </span>
+                                    <span style={{ fontSize: 'var(--font-size-xs)', opacity: 0.7 }}>
+                                      Click to open
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Venues - Right side or full width if no map */}
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'row',
+                                  gap: 'var(--spacing-3)',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                {block.localOptions && block.localOptions.length > 0 ? (
+                                  block.localOptions.slice(0, 3).map((venue, idx) => {
+                                    // Helper function to get static map URL
+                                    const getStaticMapUrl = (lat: number, lng: number): string => {
+                                      return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=14&size=300x150&markers=${lat},${lng},red`
+                                    }
+
+                                    return (
+                                      <div
+                                        key={venue.placeId || idx}
+                                        style={{
+                                          flex: '1 1 200px',
+                                          minWidth: '200px',
+                                          maxWidth: '300px',
+                                          padding: 'var(--spacing-3)',
+                                          backgroundColor: 'var(--color-surface)',
+                                          borderRadius: 'var(--radius-sm)',
+                                          border: '1px solid var(--color-border)',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: 'var(--spacing-3)',
+                                        }}
+                                      >
+                                        {/* Small map preview */}
+                                        {venue.location && (
+                                          <div
+                                            style={{
+                                              width: '100%',
+                                              height: '120px',
+                                              borderRadius: 'var(--radius-sm)',
+                                              overflow: 'hidden',
+                                              border: '1px solid var(--color-border-subtle)',
+                                              backgroundColor: 'var(--color-background)',
+                                            }}
+                                          >
+                                            <img
+                                              src={getStaticMapUrl(venue.location.lat, venue.location.lng)}
+                                              alt={`Map showing ${venue.displayName}`}
+                                              style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover',
+                                              }}
+                                              onError={(e) => {
+                                                const target = e.currentTarget as HTMLImageElement
+                                                target.style.display = 'none'
+                                                const parent = target.parentElement
+                                                if (parent) {
+                                                  parent.style.display = 'none'
+                                                }
+                                              }}
+                                            />
+                                          </div>
+                                        )}
+
+                                        <div style={{ flex: 1 }}>
+                                          <h4
+                                            style={{
+                                              fontSize: 'var(--font-size-base)',
+                                              fontWeight: 'var(--font-weight-semibold)',
+                                              color: 'var(--color-text-primary)',
+                                              marginBottom: 'var(--spacing-1)',
+                                              lineHeight: 'var(--line-height-tight)',
+                                            }}
+                                          >
+                                            {venue.displayName}
+                                          </h4>
+                                          <p
+                                            style={{
+                                              fontSize: 'var(--font-size-sm)',
+                                              color: 'var(--color-text-secondary)',
+                                              marginBottom: 'var(--spacing-2)',
+                                              lineHeight: 'var(--line-height-normal)',
+                                            }}
+                                          >
+                                            {venue.areaLabel}
+                                          </p>
+                                          {(venue.rating || venue.openNow !== undefined) && (
+                                            <div
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 'var(--spacing-2)',
+                                                flexWrap: 'wrap',
+                                              }}
+                                            >
+                                              {venue.rating && (
+                                                <span
+                                                  style={{
+                                                    fontSize: 'var(--font-size-xs)',
+                                                    color: 'var(--color-text-tertiary)',
+                                                  }}
+                                                >
+                                                  ⭐ {venue.rating.toFixed(1)}
+                                                  {venue.userRatingCount && ` (${venue.userRatingCount.toLocaleString()})`}
+                                                </span>
+                                              )}
+                                              {venue.openNow !== undefined && (
+                                                <span
+                                                  style={{
+                                                    fontSize: 'var(--font-size-xs)',
+                                                    color: venue.openNow
+                                                      ? 'var(--color-primary)'
+                                                      : 'var(--color-text-tertiary)',
+                                                  }}
+                                                >
+                                                  {venue.openNow ? '🟢 Open now' : '🔴 Closed'}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Icon buttons */}
+                                        <div
+                                          style={{
+                                            display: 'flex',
+                                            gap: 'var(--spacing-2)',
+                                            marginTop: 'auto',
+                                            justifyContent: 'flex-end',
+                                          }}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              window.open(venue.googleMapsUri, '_blank', 'noopener,noreferrer')
+                                            }}
+                                            style={{
+                                              width: '40px',
+                                              height: '40px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              borderRadius: 'var(--radius-sm)',
+                                              border: '1px solid var(--color-border)',
+                                              backgroundColor: 'var(--color-background)',
+                                              color: 'var(--color-text-primary)',
+                                              cursor: 'pointer',
+                                              transition: 'all 0.2s',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                                              e.currentTarget.style.borderColor = 'var(--color-primary)'
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.backgroundColor = 'var(--color-background)'
+                                              e.currentTarget.style.borderColor = 'var(--color-border)'
+                                            }}
+                                            aria-label={`Open ${venue.displayName} in Google Maps`}
+                                          >
+                                            <svg
+                                              width="20"
+                                              height="20"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                              <path
+                                                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+                                                stroke="currentColor"
+                                                strokeWidth="1.5"
+                                                fill="none"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                              />
+                                            </svg>
+                                          </button>
+                                          {venue.websiteUri && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                window.open(venue.websiteUri, '_blank', 'noopener,noreferrer')
+                                              }}
+                                              style={{
+                                                width: '40px',
+                                                height: '40px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: '1px solid var(--color-border)',
+                                                backgroundColor: 'var(--color-background)',
+                                                color: 'var(--color-text-primary)',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                              }}
+                                              onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                                                e.currentTarget.style.borderColor = 'var(--color-primary)'
+                                              }}
+                                              onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--color-background)'
+                                                e.currentTarget.style.borderColor = 'var(--color-border)'
+                                              }}
+                                              aria-label={`Visit ${venue.displayName} website`}
+                                            >
+                                              <svg
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                              >
+                                                <path
+                                                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"
+                                                  stroke="currentColor"
+                                                  strokeWidth="2"
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                />
+                                              </svg>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )
+                                  })
+                                ) : (
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      padding: 'var(--spacing-4)',
+                                      backgroundColor: 'var(--color-surface)',
+                                      borderRadius: 'var(--radius-sm)',
+                                      border: '1px solid var(--color-border)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <Button
+                                      variant="secondary"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const searchQuery = encodeURIComponent(`${block.title} ${trip.baseLocation}`)
+                                        window.open(
+                                          `https://www.google.com/maps/search/?api=1&query=${searchQuery}`,
+                                          '_blank',
+                                          'noopener,noreferrer'
+                                        )
+                                      }}
+                                      style={{ fontSize: 'var(--font-size-sm)' }}
+                                    >
+                                      Search in Maps
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1187,6 +1543,30 @@ export function ScheduleItineraryTab({
         learnerProfile={getLearnerProfile(currentUserId)}
         defaultLearningTarget={trip.learningTarget}
       />
+      {trip.learningTarget && (
+        <ChoosePathwayModal
+          isOpen={showChoosePathwayModal}
+          onClose={() => setShowChoosePathwayModal(false)}
+          onFinalize={handleFinalizePathway}
+          trip={trip}
+          learnerProfile={getLearnerProfile(currentUserId)}
+          learnerId={currentUserId}
+          selectedDates={(() => {
+            // Generate all dates in trip range
+            const dates: string[] = []
+            const start = new Date(trip.startDate)
+            const end = new Date(trip.endDate)
+            const current = new Date(start)
+            while (current <= end) {
+              dates.push(current.toISOString().split('T')[0])
+              current.setDate(current.getDate() + 1)
+            }
+            return dates
+          })()}
+          effortMode={trip.learningTarget.track}
+          weeklyHours={trip.learningTarget.weeklyHours}
+        />
+      )}
     </>
   )
 }

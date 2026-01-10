@@ -43,7 +43,8 @@ steps:
           --image "$$IMAGE_URI" \
           --region us-central1 \
           --platform managed \
+          --project "$PROJECT_ID" \
           --allow-unauthenticated \
-          --set-secrets "CLERK_SECRET_KEY=projects/$PROJECT_ID/secrets/CLERK_SECRET_KEY:latest"
+          --set-secrets "CLERK_SECRET_KEY=CLERK_SECRET_KEY:latest"
 
 timeout: "1200s"

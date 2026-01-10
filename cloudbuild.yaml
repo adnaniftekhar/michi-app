@@ -7,10 +7,9 @@ availableSecrets:
       env: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
     - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_MAPS_BROWSER_KEY/versions/latest
       env: NEXT_PUBLIC_MAPS_BROWSER_KEY
-    - versionName: projects/$PROJECT_ID/secrets/CLERK_SECRET_KEY/versions/latest
-      env: CLERK_SECRET_KEY
 
 steps:
+  # 1) Build + push the container image
   - name: gcr.io/cloud-builders/docker
     entrypoint: bash
     secretEnv:
@@ -20,28 +19,31 @@ steps:
       - -c
       - |
         set -euo pipefail
+
         IMAGE_URI="us-central1-docker.pkg.dev/$PROJECT_ID/michi-backend/michi-backend:$COMMIT_SHA"
 
-        docker build -t "$IMAGE_URI" \
-          --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
-          --build-arg NEXT_PUBLIC_MAPS_BROWSER_KEY="$NEXT_PUBLIC_MAPS_BROWSER_KEY" \
+        docker build -t "$$IMAGE_URI" \
+          --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+          --build-arg NEXT_PUBLIC_MAPS_BROWSER_KEY="$$NEXT_PUBLIC_MAPS_BROWSER_KEY" \
           .
 
-        docker push "$IMAGE_URI"
+        docker push "$$IMAGE_URI"
 
+  # 2) Deploy to Cloud Run, and bind Clerk secret at runtime
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
     args:
       - -c
       - |
         set -euo pipefail
+
         IMAGE_URI="us-central1-docker.pkg.dev/$PROJECT_ID/michi-backend/michi-backend:$COMMIT_SHA"
 
         gcloud run deploy michi-backend \
-          --image "$IMAGE_URI" \
+          --image "$$IMAGE_URI" \
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated \
-          --update-secrets "CLERK_SECRET_KEY=CLERK_SECRET_KEY:latest,NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:latest,NEXT_PUBLIC_MAPS_BROWSER_KEY=NEXT_PUBLIC_MAPS_BROWSER_KEY:latest"
+          --set-secrets "CLERK_SECRET_KEY=projects/$PROJECT_ID/secrets/CLERK_SECRET_KEY:latest"
 
 timeout: "1200s"

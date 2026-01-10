@@ -2,6 +2,23 @@
 
 This guide explains how to deploy the Michi app and connect it to Google Cloud Vertex AI.
 
+## Important: Build-Time Environment Variables
+
+**NEXT_PUBLIC_* variables are build-time only** - Next.js embeds them in the client bundle during `npm run build`. These must be:
+- Available during Docker build (passed as `--build-arg`)
+- Stored in Google Secret Manager (not in git)
+- Passed via Cloud Build using `cloudbuild.yaml`
+
+**Secrets Management:**
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Stored in Secret Manager
+- `NEXT_PUBLIC_MAPS_BROWSER_KEY` - Stored in Secret Manager
+- Cloud Build automatically pulls these from Secret Manager and passes them as build args
+
+**Cloud Build Setup:**
+- Use `cloudbuild.yaml` for automated builds
+- Secrets are automatically injected from Secret Manager
+- No secrets are stored in git or Docker images
+
 ## Deployment Options
 
 ### Option 1: Vercel (Recommended - Easiest)
@@ -47,43 +64,73 @@ Vercel is the easiest way to deploy Next.js apps and provides excellent integrat
 
 ---
 
-### Option 2: Google Cloud Run (Native GCP)
+### Option 2: Google Cloud Run with Cloud Build (Recommended for GCP)
 
-Since you're already using Google Cloud, Cloud Run is a natural fit.
+Automated deployment using Cloud Build with Secret Manager integration.
 
-#### Steps:
+#### Prerequisites:
 
-1. **Build and push Docker image:**
+1. **Create secrets in Secret Manager:**
    ```bash
-   # Set your project
-   gcloud config set project worldschool-mvp
+   # Create secrets for build-time environment variables
+   echo -n "your-clerk-publishable-key" | gcloud secrets create NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+     --data-file=- \
+     --replication-policy="automatic"
    
-   # Build the image
-   # Build with Next.js public environment variables
-   # These must be passed as build arguments for Next.js to embed them in the client bundle
-   docker build \
-     --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
-     --build-arg NEXT_PUBLIC_MAPS_BROWSER_KEY="${NEXT_PUBLIC_MAPS_BROWSER_KEY}" \
-     -t gcr.io/worldschool-mvp/michi-app .
-   
-   # Push to Google Container Registry
-   docker push gcr.io/worldschool-mvp/michi-app
+   echo -n "your-maps-browser-key" | gcloud secrets create NEXT_PUBLIC_MAPS_BROWSER_KEY \
+     --data-file=- \
+     --replication-policy="automatic"
    ```
 
-2. **Deploy to Cloud Run:**
+2. **Grant Cloud Build access to secrets:**
    ```bash
-   gcloud run deploy michi-app \
-     --image gcr.io/worldschool-mvp/michi-app \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --set-env-vars GOOGLE_CLOUD_PROJECT=worldschool-mvp,GOOGLE_CLOUD_LOCATION=us-central1
+   PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+   gcloud secrets add-iam-policy-binding NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor"
+   
+   gcloud secrets add-iam-policy-binding NEXT_PUBLIC_MAPS_BROWSER_KEY \
+     --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor"
    ```
 
-3. **Access your app:**
-   - Cloud Run will provide a URL like `https://michi-app-xxx.run.app`
+3. **Create Artifact Registry repository:**
+   ```bash
+   gcloud artifacts repositories create michi-backend \
+     --repository-format=docker \
+     --location=us-central1 \
+     --description="Michi backend Docker images"
+   ```
 
-**Note:** Cloud Run automatically uses Application Default Credentials, so no service account key needed!
+#### Automated Deployment:
+
+1. **Set up Cloud Build trigger:**
+   - Go to Cloud Build → Triggers
+   - Connect your GitHub repository
+   - Use `cloudbuild.yaml` as the build configuration file
+   - Trigger on push to `main` branch
+
+2. **Deploy:**
+   - Push to `main` branch
+   - Cloud Build automatically:
+     - Pulls secrets from Secret Manager
+     - Builds Docker image with build args
+     - Pushes to Artifact Registry
+     - Deploys to Cloud Run service `michi-backend`
+
+#### Manual Deployment (Alternative):
+
+If you need to deploy manually:
+
+```bash
+# Build and deploy using Cloud Build
+gcloud builds submit --config=cloudbuild.yaml
+```
+
+**Note:** 
+- Secrets are automatically pulled from Secret Manager
+- No secrets are stored in git or Docker images
+- Cloud Run automatically uses Application Default Credentials for GCP APIs
 
 ---
 

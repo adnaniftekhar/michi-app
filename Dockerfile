@@ -25,8 +25,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Run as non-root user for security
+RUN chown -R node:node /app
+USER node
 EXPOSE 8080
 CMD ["node", "server.js"]

@@ -47,3 +47,6 @@ availableSecrets:
 
 images:
   - "us-central1-docker.pkg.dev/$PROJECT_ID/michi-backend/michi-backend:$COMMIT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY

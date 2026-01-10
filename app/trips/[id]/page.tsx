@@ -2,7 +2,6 @@
 
 import { useUser } from '@clerk/nextjs'
 import { getData, setData } from '@/lib/storage'
-import { generateScheduleBlocks } from '@/lib/schedule-generator'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type {

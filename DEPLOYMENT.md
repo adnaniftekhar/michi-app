@@ -59,7 +59,12 @@ Since you're already using Google Cloud, Cloud Run is a natural fit.
    gcloud config set project worldschool-mvp
    
    # Build the image
-   docker build -t gcr.io/worldschool-mvp/michi-app .
+   # Build with Next.js public environment variables
+   # These must be passed as build arguments for Next.js to embed them in the client bundle
+   docker build \
+     --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+     --build-arg NEXT_PUBLIC_MAPS_BROWSER_KEY="${NEXT_PUBLIC_MAPS_BROWSER_KEY}" \
+     -t gcr.io/worldschool-mvp/michi-app .
    
    # Push to Google Container Registry
    docker push gcr.io/worldschool-mvp/michi-app
@@ -164,12 +169,16 @@ gcloud iam service-accounts keys create key.json \
 
 ## Environment Variables Reference
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `GOOGLE_CLOUD_PROJECT` | GCP Project ID | Yes | `worldschool-mvp` |
-| `GOOGLE_CLOUD_LOCATION` | GCP Region | Yes | `us-central1` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON | No* | - |
-| `PORT` | Server port | No | `8080` |
+| Variable | Description | Required | Default | Build Time |
+|----------|-------------|----------|---------|------------|
+| `GOOGLE_CLOUD_PROJECT` | GCP Project ID | Yes | `worldschool-mvp` | No |
+| `GOOGLE_CLOUD_LOCATION` | GCP Region | Yes | `us-central1` | No |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON | No* | - | No |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key (client-side) | Yes | - | **Yes** |
+| `NEXT_PUBLIC_MAPS_BROWSER_KEY` | Google Maps browser API key | No | - | **Yes** |
+| `PORT` | Server port | No | `8080` | No |
+
+**Note:** Variables prefixed with `NEXT_PUBLIC_` must be available at **build time** and should be passed as Docker build arguments (`--build-arg`) when building the Docker image.
 
 *Required for local development or if not using Application Default Credentials
 

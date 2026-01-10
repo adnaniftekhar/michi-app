@@ -7,9 +7,9 @@ import { NextResponse } from 'next/server'
  */
 export async function GET() {
   try {
-    // Use MAPS_BROWSER_KEY (NOT NEXT_PUBLIC_MAPS_BROWSER_KEY)
-    // This allows runtime injection in Cloud Run without rebuild
-    const mapsBrowserKey = process.env.MAPS_BROWSER_KEY || ''
+    // Check both MAPS_BROWSER_KEY (for Cloud Run) and NEXT_PUBLIC_MAPS_BROWSER_KEY (for local dev)
+    // This allows runtime injection in Cloud Run without rebuild, but also works locally
+    const mapsBrowserKey = process.env.MAPS_BROWSER_KEY || process.env.NEXT_PUBLIC_MAPS_BROWSER_KEY || ''
 
     // Always return 200, even if key is missing
     // Client can gracefully fallback to static maps

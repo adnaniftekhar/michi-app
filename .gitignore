@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .github/workflows/*.yml
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# data storage
+/data/

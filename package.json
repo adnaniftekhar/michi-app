@@ -13,6 +13,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.36.7",
     "@google-cloud/vertexai": "^1.10.0",
     "@googlemaps/js-api-loader": "^2.0.2",
     "@hookform/resolvers": "^3.9.1",

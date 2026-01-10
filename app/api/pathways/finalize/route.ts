@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { VertexAI } from '@google-cloud/vertexai'
 import { createAIPlanResponseSchema } from '@/lib/ai-plan-schema'
 import type { FinalizePathwayRequest, FinalPathwayPlan, PathwayDraft } from '@/types'
 
 export async function POST(request: Request) {
   try {
+    // Verify user is authenticated
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const body: FinalizePathwayRequest & { trip?: any; learnerProfile?: any; chosenDraft?: PathwayDraft; editedDraft?: PathwayDraft } = await request.json()
     const { tripId, learnerId, chosenDraftId, selectedDates, effortMode, editedDraft } = body
 

@@ -27,6 +27,16 @@ export function getAllUsers(): DemoUser[] {
 }
 
 export function getDemoUser(id: string): DemoUser | undefined {
+  // If it's a Clerk user ID (starts with 'user_'), create a temporary user object
+  if (id.startsWith('user_')) {
+    return {
+      id,
+      name: 'Me', // Will be replaced with actual name from Clerk if needed
+      timezone: 'UTC', // Default timezone
+      isCustom: true,
+    }
+  }
+  
   // Check custom users first (they override built-in users)
   const customUsers = getCustomUsers()
   const custom = customUsers.find(u => u.id === id)

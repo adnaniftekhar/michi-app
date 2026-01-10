@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { Trip, ScheduleBlock, LearningTarget } from '@/types'
+import type { Trip, ScheduleBlock, LearningTarget, LocalVenueSuggestion } from '@/types'
 import './ScheduleItineraryTab.css'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -21,6 +21,241 @@ import { getLearnerProfile } from '@/lib/learner-profiles'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { getUserSettings } from '@/lib/user-settings'
 import { detectActivityType, getActivityIconUrl, getActivityImageAlt, getActivityIconFallback } from '@/lib/activity-images'
+
+// VenueCard component for Local Options
+function VenueCard({ venue }: { venue: LocalVenueSuggestion }) {
+  const [venuePhoto, setVenuePhoto] = useState<{ photoName: string; attribution?: { displayName: string; uri: string } } | null>(null)
+
+  // Fetch place photo on mount
+  useEffect(() => {
+    if (!venue.placeId) return
+    
+    fetch(`/api/places/${venue.placeId}/details?fields=photos`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.photos && data.photos.length > 0) {
+          const firstPhoto = data.photos[0]
+          setVenuePhoto({
+            photoName: firstPhoto.name,
+            attribution: firstPhoto.authorAttributions?.[0],
+          })
+        }
+      })
+      .catch(() => {
+        // Silently fail, no photo will be shown
+      })
+  }, [venue.placeId])
+
+  return (
+    <div
+      style={{
+        flex: '1 1 200px',
+        minWidth: '200px',
+        maxWidth: '300px',
+        padding: 'var(--spacing-3)',
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-3)',
+      }}
+    >
+      {/* Place photo if available */}
+      {venuePhoto && (
+        <div
+          style={{
+            width: '100%',
+            height: '120px',
+            borderRadius: 'var(--radius-sm)',
+            overflow: 'hidden',
+            border: '1px solid var(--color-border-subtle)',
+            backgroundColor: 'var(--color-background)',
+          }}
+        >
+          <img
+            src={`/api/places/photo?photoName=${encodeURIComponent(venuePhoto.photoName)}&maxHeightPx=120&maxWidthPx=300`}
+            alt={venue.displayName}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+            onError={(e) => {
+              // Hide photo if it fails to load
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        </div>
+      )}
+
+      <div style={{ flex: 1 }}>
+        <h4
+          style={{
+            fontSize: 'var(--font-size-base)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--color-text-primary)',
+            marginBottom: 'var(--spacing-1)',
+            lineHeight: 'var(--line-height-tight)',
+          }}
+        >
+          {venue.displayName}
+        </h4>
+        <p
+          style={{
+            fontSize: 'var(--font-size-sm)',
+            color: 'var(--color-text-secondary)',
+            marginBottom: 'var(--spacing-2)',
+            lineHeight: 'var(--line-height-normal)',
+          }}
+        >
+          {venue.areaLabel}
+        </p>
+        {(venue.rating || venue.openNow !== undefined) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-2)',
+              flexWrap: 'wrap',
+            }}
+          >
+            {venue.rating && (
+              <span
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                ⭐ {venue.rating.toFixed(1)}
+                {venue.userRatingCount && ` (${venue.userRatingCount.toLocaleString()})`}
+              </span>
+            )}
+            {venue.openNow !== undefined && (
+              <span
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: venue.openNow
+                    ? 'var(--color-primary)'
+                    : 'var(--color-text-tertiary)',
+                }}
+              >
+                {venue.openNow ? '🟢 Open now' : '🔴 Closed'}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Action buttons with text labels */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--spacing-2)',
+          marginTop: 'auto',
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            window.open(venue.googleMapsUri, '_blank', 'noopener,noreferrer')
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--spacing-2)',
+            padding: 'var(--spacing-2) var(--spacing-3)',
+            height: '36px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-background)',
+            color: 'var(--color-text-primary)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            fontSize: 'var(--font-size-sm)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+            e.currentTarget.style.borderColor = 'var(--color-primary)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-background)'
+            e.currentTarget.style.borderColor = 'var(--color-border)'
+          }}
+          aria-label={`Open ${venue.displayName} in Google Maps`}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+              fill="currentColor"
+            />
+          </svg>
+          <span>Map</span>
+        </button>
+        {venue.websiteUri && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              window.open(venue.websiteUri, '_blank', 'noopener,noreferrer')
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-2)',
+              padding: 'var(--spacing-2) var(--spacing-3)',
+              height: '36px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-background)',
+              color: 'var(--color-text-primary)',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontSize: 'var(--font-size-sm)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+              e.currentTarget.style.borderColor = 'var(--color-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-background)'
+              e.currentTarget.style.borderColor = 'var(--color-border)'
+            }}
+            aria-label={`Open ${venue.displayName} website`}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>Website</span>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface ScheduleItineraryTabProps {
   trip: Trip
@@ -48,6 +283,21 @@ export function ScheduleItineraryTab({
   const [mapModalLocation, setMapModalLocation] = useState<{ location: string; title: string; coordinates?: { lat: number; lng: number } } | null>(null)
   const [showImagesAndMaps, setShowImagesAndMaps] = useState(true)
   const [generationOptions, setGenerationOptions] = useState<PathwayGenerationOptions | null>(null)
+  const [mapsBrowserKey, setMapsBrowserKey] = useState<string>('')
+
+  // Fetch Maps API key on mount
+  useEffect(() => {
+    fetch('/api/public-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.mapsBrowserKey) {
+          setMapsBrowserKey(data.mapsBrowserKey)
+        }
+      })
+      .catch(() => {
+        // Silently fail, will use fallback
+      })
+  }, [])
 
   useEffect(() => {
     const settings = getUserSettings()
@@ -771,32 +1021,20 @@ export function ScheduleItineraryTab({
                                 <>
                                   <Button
                                     variant="secondary"
-                                    size="sm"
+                                    size="md"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleEditBlock(block)
-                                    }}
-                                    style={{
-                                      backgroundColor: headerImageUrl ? 'rgba(255,255,255,0.95)' : 'var(--color-surface-hover)',
-                                      color: headerImageUrl ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
-                                      border: headerImageUrl ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--color-border)',
-                                      fontWeight: 'var(--font-weight-medium)',
                                     }}
                                   >
                                     Edit
                                   </Button>
                                   <Button
-                                    variant="tertiary"
-                                    size="sm"
+                                    variant="danger"
+                                    size="md"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleDeleteBlock(block.id)
-                                    }}
-                                    style={{ 
-                                      color: headerImageUrl ? 'white' : 'var(--color-danger)',
-                                      backgroundColor: headerImageUrl ? 'rgba(239,68,68,0.9)' : 'var(--color-surface-hover)',
-                                      border: headerImageUrl ? '1px solid rgba(239,68,68,0.5)' : '1px solid var(--color-border)',
-                                      fontWeight: 'var(--font-weight-medium)',
                                     }}
                                   >
                                     Delete
@@ -1253,253 +1491,9 @@ export function ScheduleItineraryTab({
                               >
                                 {block.localOptions && block.localOptions.length > 0 ? (
                                   block.localOptions.slice(0, 3).map((venue, idx) => {
-                                    // Helper function to get static map URL
-                                    const getStaticMapUrl = (lat: number, lng: number): string => {
-                                      return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=14&size=300x150&markers=${lat},${lng},red`
-                                    }
-
-                                    return (
-                                      <div
-                                        key={venue.placeId || idx}
-                                        style={{
-                                          flex: '1 1 200px',
-                                          minWidth: '200px',
-                                          maxWidth: '300px',
-                                          padding: 'var(--spacing-3)',
-                                          backgroundColor: 'var(--color-surface)',
-                                          borderRadius: 'var(--radius-sm)',
-                                          border: '1px solid var(--color-border)',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: 'var(--spacing-3)',
-                                        }}
-                                      >
-                                        {/* Small map preview */}
-                                        {venue.location && (
-                                          <div
-                                            style={{
-                                              width: '100%',
-                                              height: '120px',
-                                              borderRadius: 'var(--radius-sm)',
-                                              overflow: 'hidden',
-                                              border: '1px solid var(--color-border-subtle)',
-                                              backgroundColor: 'var(--color-background)',
-                                            }}
-                                          >
-                                            <img
-                                              src={getStaticMapUrl(venue.location.lat, venue.location.lng)}
-                                              alt={`Map showing ${venue.displayName}`}
-                                              style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                objectFit: 'cover',
-                                              }}
-                                              onError={(e) => {
-                                                const target = e.currentTarget as HTMLImageElement
-                                                target.style.display = 'none'
-                                                const parent = target.parentElement
-                                                if (parent) {
-                                                  parent.style.display = 'none'
-                                                }
-                                              }}
-                                            />
-                                          </div>
-                                        )}
-
-                                        <div style={{ flex: 1 }}>
-                                          <h4
-                                            style={{
-                                              fontSize: 'var(--font-size-base)',
-                                              fontWeight: 'var(--font-weight-semibold)',
-                                              color: 'var(--color-text-primary)',
-                                              marginBottom: 'var(--spacing-1)',
-                                              lineHeight: 'var(--line-height-tight)',
-                                            }}
-                                          >
-                                            {venue.displayName}
-                                          </h4>
-                                          <p
-                                            style={{
-                                              fontSize: 'var(--font-size-sm)',
-                                              color: 'var(--color-text-secondary)',
-                                              marginBottom: 'var(--spacing-2)',
-                                              lineHeight: 'var(--line-height-normal)',
-                                            }}
-                                          >
-                                            {venue.areaLabel}
-                                          </p>
-                                          {(venue.rating || venue.openNow !== undefined) && (
-                                            <div
-                                              style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 'var(--spacing-2)',
-                                                flexWrap: 'wrap',
-                                              }}
-                                            >
-                                              {venue.rating && (
-                                                <span
-                                                  style={{
-                                                    fontSize: 'var(--font-size-xs)',
-                                                    color: 'var(--color-text-tertiary)',
-                                                  }}
-                                                >
-                                                  ⭐ {venue.rating.toFixed(1)}
-                                                  {venue.userRatingCount && ` (${venue.userRatingCount.toLocaleString()})`}
-                                                </span>
-                                              )}
-                                              {venue.openNow !== undefined && (
-                                                <span
-                                                  style={{
-                                                    fontSize: 'var(--font-size-xs)',
-                                                    color: venue.openNow
-                                                      ? 'var(--color-primary)'
-                                                      : 'var(--color-text-tertiary)',
-                                                  }}
-                                                >
-                                                  {venue.openNow ? '🟢 Open now' : '🔴 Closed'}
-                                                </span>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Icon buttons */}
-                                        <div
-                                          style={{
-                                            display: 'flex',
-                                            gap: 'var(--spacing-2)',
-                                            marginTop: 'auto',
-                                            justifyContent: 'flex-end',
-                                          }}
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              window.open(venue.googleMapsUri, '_blank', 'noopener,noreferrer')
-                                            }}
-                                            style={{
-                                              width: '40px',
-                                              height: '40px',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              borderRadius: 'var(--radius-sm)',
-                                              border: '1px solid var(--color-border)',
-                                              backgroundColor: 'var(--color-background)',
-                                              color: 'var(--color-text-primary)',
-                                              cursor: 'pointer',
-                                              transition: 'all 0.2s',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                                              e.currentTarget.style.borderColor = 'var(--color-primary)'
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              e.currentTarget.style.backgroundColor = 'var(--color-background)'
-                                              e.currentTarget.style.borderColor = 'var(--color-border)'
-                                            }}
-                                            aria-label={`Open ${venue.displayName} in Google Maps`}
-                                          >
-                                            <svg
-                                              width="20"
-                                              height="20"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                              <path
-                                                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
-                                                stroke="currentColor"
-                                                strokeWidth="1.5"
-                                                fill="none"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                              />
-                                            </svg>
-                                          </button>
-                                          {venue.websiteUri && (
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                window.open(venue.websiteUri, '_blank', 'noopener,noreferrer')
-                                              }}
-                                              style={{
-                                                width: '40px',
-                                                height: '40px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                borderRadius: 'var(--radius-sm)',
-                                                border: '1px solid var(--color-border)',
-                                                backgroundColor: 'var(--color-background)',
-                                                color: 'var(--color-text-primary)',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                              }}
-                                              onMouseEnter={(e) => {
-                                                e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                                                e.currentTarget.style.borderColor = 'var(--color-primary)'
-                                              }}
-                                              onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor = 'var(--color-background)'
-                                                e.currentTarget.style.borderColor = 'var(--color-border)'
-                                              }}
-                                              aria-label={`Visit ${venue.displayName} website`}
-                                            >
-                                              <svg
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                              >
-                                                <path
-                                                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"
-                                                  stroke="currentColor"
-                                                  strokeWidth="2"
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                />
-                                              </svg>
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )
+                                    return <VenueCard key={venue.placeId || idx} venue={venue} />
                                   })
-                                ) : (
-                                  <div
-                                    style={{
-                                      flex: 1,
-                                      padding: 'var(--spacing-4)',
-                                      backgroundColor: 'var(--color-surface)',
-                                      borderRadius: 'var(--radius-sm)',
-                                      border: '1px solid var(--color-border)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                    }}
-                                  >
-                                    <Button
-                                      variant="secondary"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        const searchQuery = encodeURIComponent(`${block.title} ${trip.baseLocation}`)
-                                        window.open(
-                                          `https://www.google.com/maps/search/?api=1&query=${searchQuery}`,
-                                          '_blank',
-                                          'noopener,noreferrer'
-                                        )
-                                      }}
-                                      style={{ fontSize: 'var(--font-size-sm)' }}
-                                    >
-                                      Search in Maps
-                                    </Button>
-                                  </div>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </div>

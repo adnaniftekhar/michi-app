@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { VertexAI } from '@google-cloud/vertexai'
 import { getLearnerProfile } from '@/lib/learner-profiles'
 import type { Trip, LearningTarget } from '@/types'
@@ -6,11 +7,45 @@ import type { PathwayDraft, PathwayDraftsResponse, PathwayDraftType } from '@/ty
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    console.log('[Pathway Drafts API] Request received')
+    
+    // Verify user is authenticated
+    const { userId } = await auth()
+    console.log('[Pathway Drafts API] Auth check:', { hasUserId: !!userId })
+    
+    if (!userId) {
+      console.error('[Pathway Drafts API] Unauthorized - no userId')
+      return NextResponse.json(
+        { error: 'Unauthorized', details: 'Please sign in to generate pathway drafts' },
+        { status: 401 }
+      )
+    }
+
+    let body: any
+    try {
+      body = await request.json()
+      console.log('[Pathway Drafts API] Request body keys:', Object.keys(body))
+    } catch (parseError) {
+      console.error('[Pathway Drafts API] Failed to parse request body:', parseError)
+      return NextResponse.json(
+        {
+          error: 'Invalid request body',
+          details: parseError instanceof Error ? parseError.message : 'Request body is not valid JSON',
+        },
+        { status: 400 }
+      )
+    }
+    
     const { tripId, learnerId, selectedDates, effortMode } = body
 
     // Validate required fields
     if (!tripId || !learnerId || !selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0 || !effortMode) {
+      console.error('[Pathway Drafts API] Missing required fields:', { 
+        tripId: !!tripId, 
+        learnerId: !!learnerId, 
+        selectedDates: selectedDates?.length, 
+        effortMode: !!effortMode 
+      })
       return NextResponse.json(
         { error: 'Missing required fields: tripId, learnerId, selectedDates (non-empty array), effortMode' },
         { status: 400 }
@@ -21,42 +56,128 @@ export async function POST(request: Request) {
     // For now, we'll need to pass trip data in the request or fetch from storage
     const { trip, learnerProfile } = body
     if (!trip || !learnerProfile) {
+      console.error('[Pathway Drafts API] Missing trip or learnerProfile:', { 
+        hasTrip: !!trip, 
+        hasLearnerProfile: !!learnerProfile 
+      })
       return NextResponse.json(
         { error: 'Missing trip or learnerProfile in request body' },
         { status: 400 }
       )
     }
 
+    console.log('[Pathway Drafts API] Starting draft generation...')
+
     // Initialize Vertex AI
     const project = process.env.GOOGLE_CLOUD_PROJECT || 'worldschool-mvp'
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1'
     
-    const vertex = new VertexAI({
-      project,
-      location,
-    })
+    console.log('[Pathway Drafts API] Initializing Vertex AI:', { project, location })
+    
+    let vertex: VertexAI
+    try {
+      vertex = new VertexAI({
+        project,
+        location,
+      })
+    } catch (initError) {
+      console.error('[Pathway Drafts API] Failed to initialize Vertex AI:', initError)
+      return NextResponse.json(
+        {
+          error: 'Failed to initialize AI service',
+          details: initError instanceof Error ? initError.message : String(initError),
+        },
+        { status: 500 }
+      )
+    }
 
-    const model = vertex.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-    })
+    let model
+    try {
+      model = vertex.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+      })
+    } catch (modelError) {
+      console.error('[Pathway Drafts API] Failed to get generative model:', modelError)
+      return NextResponse.json(
+        {
+          error: 'Failed to load AI model',
+          details: modelError instanceof Error ? modelError.message : String(modelError),
+        },
+        { status: 500 }
+      )
+    }
 
     const numDays = selectedDates.length
 
     // Build prompt for generating 3 pathway draft options
-    const prompt = buildDraftsPrompt(learnerProfile, trip, effortMode, selectedDates, numDays)
-
-    console.log('Generating pathway drafts, prompt length:', prompt.length)
-
-    const result = await model.generateContent({
-      contents: [
+    let prompt: string
+    try {
+      prompt = buildDraftsPrompt(learnerProfile, trip, effortMode, selectedDates, numDays)
+      console.log('[Pathway Drafts API] Prompt built successfully, length:', prompt.length)
+    } catch (promptError) {
+      console.error('[Pathway Drafts API] Failed to build prompt:', promptError)
+      return NextResponse.json(
         {
-          role: 'user',
-          parts: [{ text: prompt }],
+          error: 'Failed to build generation prompt',
+          details: promptError instanceof Error ? promptError.message : String(promptError),
         },
-      ],
-    })
+        { status: 500 }
+      )
+    }
+
+    if (!prompt || prompt.trim().length === 0) {
+      console.error('[Pathway Drafts API] Empty prompt generated')
+      return NextResponse.json(
+        {
+          error: 'Failed to generate prompt',
+          details: 'The prompt builder returned an empty string',
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('[Pathway Drafts API] Generating drafts, prompt length:', prompt.length)
+
+    let result
+    try {
+      result = await model.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+      })
+      console.log('[Pathway Drafts API] AI generation completed')
+    } catch (genError) {
+      console.error('[Pathway Drafts API] Failed to generate content:', genError)
+      console.error('[Pathway Drafts API] Generation error details:', {
+        message: genError instanceof Error ? genError.message : String(genError),
+        name: genError instanceof Error ? genError.name : 'Unknown',
+        stack: genError instanceof Error ? genError.stack : undefined,
+      })
+      return NextResponse.json(
+        {
+          error: 'Failed to generate pathway drafts from AI',
+          details: genError instanceof Error ? genError.message : String(genError),
+        },
+        { status: 500 }
+      )
+    }
 
     const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    console.log('[Pathway Drafts API] AI response received, length:', responseText.length)
+    
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('[Pathway Drafts API] Empty response from AI')
+      return NextResponse.json(
+        {
+          error: 'AI returned empty response',
+          details: 'The AI model did not generate any content. Please try again.',
+        },
+        { status: 500 }
+      )
+    }
     
     // Parse JSON response
     let parsedResponse
@@ -64,8 +185,10 @@ export async function POST(request: Request) {
       const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/```\s*([\s\S]*?)\s*```/)
       const jsonText = jsonMatch ? jsonMatch[1] : responseText
       parsedResponse = JSON.parse(jsonText.trim())
+      console.log('[Pathway Drafts API] Successfully parsed AI response')
     } catch (parseError) {
-      console.error('Failed to parse drafts response:', parseError)
+      console.error('[Pathway Drafts API] Failed to parse drafts response:', parseError)
+      console.error('[Pathway Drafts API] Response text preview:', responseText.substring(0, 500))
       return NextResponse.json(
         { error: 'Invalid JSON response from AI', details: String(parseError) },
         { status: 500 }
@@ -109,13 +232,40 @@ export async function POST(request: Request) {
       drafts: finalDrafts,
     }
 
+    console.log('[Pathway Drafts API] Successfully generated', finalDrafts.length, 'drafts')
     return NextResponse.json(response)
   } catch (error) {
-    console.error('Error generating pathway drafts:', error)
+    console.error('[Pathway Drafts API] Unexpected error:', error)
+    console.error('[Pathway Drafts API] Error type:', typeof error)
+    console.error('[Pathway Drafts API] Error constructor:', error?.constructor?.name)
+    
+    // Safely extract error information
+    let errorMessage = 'Unknown error'
+    let errorStack: string | undefined
+    let errorName: string | undefined
+    
+    if (error instanceof Error) {
+      errorMessage = error.message || 'Unknown error'
+      errorStack = error.stack
+      errorName = error.name
+    } else if (typeof error === 'string') {
+      errorMessage = error
+    } else if (error && typeof error === 'object') {
+      errorMessage = (error as any).message || JSON.stringify(error)
+    }
+    
+    console.error('[Pathway Drafts API] Error details:', {
+      message: errorMessage,
+      name: errorName,
+      hasStack: !!errorStack,
+    })
+    
     return NextResponse.json(
       {
         error: 'Failed to generate pathway drafts',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: errorMessage,
+        ...(errorName && { errorType: errorName }),
+        ...(errorStack && { stack: errorStack }),
       },
       { status: 500 }
     )

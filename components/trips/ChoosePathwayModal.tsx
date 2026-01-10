@@ -143,9 +143,20 @@ export function ChoosePathwayModal({
     setError(null)
 
     try {
+      console.log('Loading pathway drafts with:', {
+        tripId: trip.id,
+        learnerId,
+        selectedDatesCount: selectedDates.length,
+        effortMode,
+        hasTrip: !!trip,
+        hasLearnerProfile: !!learnerProfile,
+      })
+
       const response = await fetch('/api/pathways/drafts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           tripId: trip.id,
           learnerId,
@@ -156,9 +167,35 @@ export function ChoosePathwayModal({
         }),
       })
 
+      console.log('Pathway drafts API response status:', response.status, response.statusText)
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to load pathway drafts')
+        let errorMessage = `Failed to load pathway drafts (${response.status})`
+        let errorData: any = {}
+        
+        try {
+          const contentType = response.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json()
+            errorMessage = errorData.error || errorData.details || errorMessage
+            console.error('Pathway drafts API error (JSON):', errorData)
+          } else {
+            // Response is not JSON (might be HTML redirect or plain text)
+            const text = await response.text()
+            errorMessage = `Server returned ${response.status}: ${text.substring(0, 200)}`
+            console.error('Pathway drafts API error (non-JSON):', {
+              status: response.status,
+              statusText: response.statusText,
+              contentType,
+              textPreview: text.substring(0, 500),
+            })
+          }
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError)
+          errorMessage = `Failed to load pathway drafts (${response.status} ${response.statusText})`
+        }
+        
+        throw new Error(errorMessage)
       }
 
       const data: PathwayDraftsResponse = await response.json()
@@ -316,20 +353,88 @@ export function ChoosePathwayModal({
   const getDisplayDraft = (draft: PathwayDraft) => draftEdits[draft.id] || draft
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-      onClick={onClose}
-    >
+    <>
+      {/* Generating Overlay - Centered on screen */}
+      {isFinalizing && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-card)',
+              padding: 'var(--spacing-8)',
+              maxWidth: '500px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            }}
+          >
+            <div style={{ marginBottom: 'var(--spacing-6)' }}>
+              <LoadingSpinner size="lg" />
+            </div>
+            <h3
+              style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 'var(--font-weight-semibold)',
+                color: 'var(--color-text-primary)',
+                marginBottom: 'var(--spacing-3)',
+              }}
+            >
+              Generating Your Pathway
+            </h3>
+            <p
+              style={{
+                fontSize: 'var(--font-size-base)',
+                color: 'var(--color-text-secondary)',
+                lineHeight: 'var(--line-height-relaxed)',
+                marginBottom: 'var(--spacing-4)',
+              }}
+            >
+              Please stay on this page while we create your detailed learning plan. Navigating away will cancel the generation process.
+            </p>
+            <div
+              style={{
+                padding: 'var(--spacing-4)',
+                backgroundColor: 'var(--color-background)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-tertiary)',
+                  fontStyle: 'italic',
+                }}
+              >
+                This may take 7-43 seconds...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
-        className="max-w-6xl w-full overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-card)',
-          maxHeight: '90vh',
-        }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+        onClick={onClose}
       >
+        <div
+          className="max-w-6xl w-full overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-card)',
+            maxHeight: '90vh',
+            opacity: isFinalizing ? 0.3 : 1,
+            pointerEvents: isFinalizing ? 'none' : 'auto',
+          }}
+        >
         {/* Header */}
         <div
           className="flex items-center justify-between"
@@ -846,47 +951,50 @@ export function ChoosePathwayModal({
           style={{
             padding: 'var(--spacing-6)',
             borderTop: '1px solid var(--color-border-subtle)',
+            backgroundColor: 'var(--color-background)',
           }}
         >
-          <Button variant="secondary" onClick={onClose} disabled={isFinalizing}>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={onClose}
+            disabled={isFinalizing}
+          >
             Cancel
           </Button>
           <Button
             variant="primary"
+            size="lg"
             onClick={handleFinalize}
             disabled={!selectedDraftId || isFinalizing || isLoadingDrafts || selectedDates.length === 0}
-            isLoading={isFinalizing}
-            style={{
-              minWidth: '200px',
-              fontWeight: 'var(--font-weight-semibold)',
-            }}
           >
-            {isFinalizing ? 'Generating...' : 'Generate Detailed Plan'}
+            Generate Detailed Plan
           </Button>
         </div>
-      </div>
 
-      <style jsx>{`
-        @media (max-width: 1023px) {
-          .pathway-drafts-grid {
-            grid-template-columns: repeat(2, 1fr) !important;
+        <style jsx>{`
+          @media (max-width: 1023px) {
+            .pathway-drafts-grid {
+              grid-template-columns: repeat(2, 1fr) !important;
+            }
           }
-        }
-        @media (max-width: 640px) {
-          .pathway-drafts-grid {
-            grid-template-columns: 1fr !important;
+          @media (max-width: 640px) {
+            .pathway-drafts-grid {
+              grid-template-columns: 1fr !important;
+            }
           }
-        }
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
           }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
+        `}</style>
+      </div>
     </div>
+    </>
   )
 }
 

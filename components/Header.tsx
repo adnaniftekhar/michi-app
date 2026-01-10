@@ -8,16 +8,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Button } from './ui/Button'
 import { useState, useEffect, useRef } from 'react'
-import { CreateLearnerModal } from './CreateLearnerModal'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import { saveCustomUser, saveCustomProfile } from '@/lib/custom-users'
 import { showToast } from './ui/Toast'
+import { UserButton, SignInButton, SignedIn, SignedOut } from '@clerk/nextjs'
 
 export function Header() {
-  const { currentUser, setCurrentUserId } = useDemoUser()
+  const { currentUser, setCurrentUserId, isAdmin } = useDemoUser()
   const pathname = usePathname()
   const router = useRouter()
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showLearnerMenu, setShowLearnerMenu] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -73,7 +71,7 @@ export function Header() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link
-              href="/"
+              href="/home"
               className="flex items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-opacity"
               style={{
                 outlineColor: 'var(--color-focus-ring)',
@@ -97,7 +95,7 @@ export function Header() {
             {isTripPage && (
               <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-2 text-sm">
                 <Link
-                  href="/"
+                  href="/home"
                   className="hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                   style={{
                     color: 'var(--color-text-secondary)',
@@ -131,192 +129,184 @@ export function Header() {
               }}
               aria-hidden="true"
             />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setShowCreateModal(true)}
-            >
-              + New Learner
-            </Button>
-            <div
-              style={{
-                width: '1px',
-                height: '24px',
-                backgroundColor: 'var(--color-border)',
-                marginLeft: 'var(--spacing-1)',
-                marginRight: 'var(--spacing-1)',
-              }}
-              aria-hidden="true"
-            />
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setShowLearnerMenu(!showLearnerMenu)}
-                className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-primary)',
-                  padding: 'var(--spacing-2) var(--spacing-3)',
-                  borderRadius: 'var(--radius-button)',
-                  border: '1px solid var(--color-border)',
-                  backgroundColor: showLearnerMenu ? 'var(--color-surface-hover)' : 'transparent',
-                  outlineColor: 'var(--color-focus-ring)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  if (!showLearnerMenu) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-                aria-label="Select learner"
-                aria-expanded={showLearnerMenu}
-              >
-                <span style={{ color: 'var(--color-text-secondary)' }}>Learner:</span>
-                <span>{currentUser.name}</span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="none"
+            {/* Admin-only: Switch User dropdown */}
+            {isAdmin && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setShowLearnerMenu(!showLearnerMenu)}
+                  className="flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                   style={{
-                    transform: showLearnerMenu ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                >
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                  />
-                </svg>
-              </button>
-              {showLearnerMenu && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: 'var(--spacing-2)',
-                    minWidth: '200px',
-                    backgroundColor: 'var(--color-surface)',
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-primary)',
+                    padding: 'var(--spacing-2) var(--spacing-3)',
+                    borderRadius: 'var(--radius-button)',
                     border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-card)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                    zIndex: 50,
-                    overflow: 'hidden',
+                    backgroundColor: showLearnerMenu ? 'var(--color-surface-hover)' : 'transparent',
+                    outlineColor: 'var(--color-focus-ring)',
                   }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showLearnerMenu) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
+                  aria-label="Select learner"
+                  aria-expanded={showLearnerMenu}
                 >
+                  <span style={{ color: 'var(--color-text-secondary)' }}>Learner:</span>
+                  <span>{currentUser.name}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    style={{
+                      transform: showLearnerMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease',
+                    }}
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    />
+                  </svg>
+                </button>
+                {showLearnerMenu && (
                   <div
                     style={{
-                      padding: 'var(--spacing-2)',
-                      borderBottom: '1px solid var(--color-border-subtle)',
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: 'var(--spacing-2)',
+                      minWidth: '200px',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-card)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                      zIndex: 50,
+                      overflow: 'hidden',
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--color-text-secondary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        padding: 'var(--spacing-2) var(--spacing-3)',
+                        padding: 'var(--spacing-2)',
+                        borderBottom: '1px solid var(--color-border-subtle)',
                       }}
                     >
-                      Select learner
+                      <div
+                        style={{
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-secondary)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          padding: 'var(--spacing-2) var(--spacing-3)',
+                        }}
+                      >
+                        Select learner
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {users.map((user) => (
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {users.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => {
+                            setCurrentUserId(user.id)
+                            if (mounted) {
+                              setUsers(getAllUsers())
+                            }
+                            setShowLearnerMenu(false)
+                          }}
+                          className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
+                          style={{
+                            padding: 'var(--spacing-3)',
+                            fontSize: 'var(--font-size-sm)',
+                            color: currentUser.id === user.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                            backgroundColor: currentUser.id === user.id ? 'var(--color-surface-hover)' : 'transparent',
+                            outlineColor: 'var(--color-focus-ring)',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentUser.id !== user.id) {
+                              e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentUser.id !== user.id) {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }
+                          }}
+                        >
+                          {user.name}
+                          {user.isCustom && (
+                            <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--spacing-2)' }}>
+                              (Custom)
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      style={{
+                        borderTop: '1px solid var(--color-border-subtle)',
+                        padding: 'var(--spacing-2)',
+                      }}
+                    >
                       <button
-                        key={user.id}
                         onClick={() => {
-                          setCurrentUserId(user.id)
-                          if (mounted) {
-                            setUsers(getAllUsers())
-                          }
                           setShowLearnerMenu(false)
+                          setShowResetConfirm(true)
                         }}
                         className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
                         style={{
                           padding: 'var(--spacing-3)',
                           fontSize: 'var(--font-size-sm)',
-                          color: currentUser.id === user.id ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                          backgroundColor: currentUser.id === user.id ? 'var(--color-surface-hover)' : 'transparent',
+                          color: 'var(--color-danger)',
+                          backgroundColor: 'transparent',
                           outlineColor: 'var(--color-focus-ring)',
                         }}
                         onMouseEnter={(e) => {
-                          if (currentUser.id !== user.id) {
-                            e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                          }
+                          e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
                         }}
                         onMouseLeave={(e) => {
-                          if (currentUser.id !== user.id) {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                          }
+                          e.currentTarget.style.backgroundColor = 'transparent'
                         }}
                       >
-                        {user.name}
-                        {user.isCustom && (
-                          <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 'var(--spacing-2)' }}>
-                            (Custom)
-                          </span>
-                        )}
+                        Reset demo data
                       </button>
-                    ))}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      borderTop: '1px solid var(--color-border-subtle)',
-                      padding: 'var(--spacing-2)',
-                    }}
-                  >
-                    <button
-                      onClick={() => {
-                        setShowLearnerMenu(false)
-                        setShowResetConfirm(true)
-                      }}
-                      className="w-full text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors"
-                      style={{
-                        padding: 'var(--spacing-3)',
-                        fontSize: 'var(--font-size-sm)',
-                        color: 'var(--color-danger)',
-                        backgroundColor: 'transparent',
-                        outlineColor: 'var(--color-focus-ring)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      Reset demo data
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
+
+            {/* Clerk Auth: Sign in button for signed out users, UserButton for signed in users */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="secondary" size="sm">
+                  Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: {
+                      width: '32px',
+                      height: '32px',
+                    },
+                  },
+                }}
+              />
+            </SignedIn>
           </div>
         </div>
       </div>
-      <CreateLearnerModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSave={(user, profile) => {
-          saveCustomUser(user)
-          saveCustomProfile(user.id, profile)
-          setCurrentUserId(user.id)
-          // Refresh users list to include the new user
-          if (mounted) {
-            setUsers(getAllUsers())
-          }
-          setShowCreateModal(false)
-          showToast('New learner created!', 'success')
-        }}
-      />
       <ConfirmDialog
         isOpen={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}

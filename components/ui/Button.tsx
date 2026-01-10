@@ -83,6 +83,7 @@ export function Button({
         ...baseStyles,
         ...sizeStyles[size],
         ...variantStyles[variant],
+        ...props.style, // Allow inline styles to override
       } as React.CSSProperties}
       disabled={disabled}
       onMouseEnter={(e) => {

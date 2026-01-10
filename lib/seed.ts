@@ -203,17 +203,24 @@ export function generateSeedData(): Record<DemoUserId, AppData> {
     result[userId] = { trips: [], itinerary: {}, scheduleBlocks: {}, activityLogs: {} }
   }
 
-  // Generate trips for all users
+  // Note: Trips are now stored in the database via API routes, not in localStorage
+  // Only seed scheduleBlocks and activityLogs for demo users (for backward compatibility)
+  // Trips should be created through the API for signed-in users
   for (const userId of allUserIds) {
     const userData = result[userId]
 
+    // Don't seed trips anymore - they're stored in the database
+    // Only seed scheduleBlocks and activityLogs if needed for demo purposes
+    // (This is kept for backward compatibility with existing demo data)
     for (const tripDef of TRIP_DEFINITIONS) {
-      const { trip, itinerary, scheduleBlocks, activityLogs } = generateTripData(tripDef, userId)
+      const { itinerary, scheduleBlocks, activityLogs } = generateTripData(tripDef, userId)
 
-      userData.trips.push(trip)
-      userData.itinerary[trip.id] = itinerary
-      userData.scheduleBlocks[trip.id] = scheduleBlocks
-      userData.activityLogs[trip.id] = activityLogs
+      // Note: trip is not added to userData.trips - trips are now in the database
+      // Only keep scheduleBlocks and activityLogs for demo users
+      const tripId = `${tripDef.id}-${userId}`
+      userData.itinerary[tripId] = itinerary
+      userData.scheduleBlocks[tripId] = scheduleBlocks
+      userData.activityLogs[tripId] = activityLogs
     }
   }
 

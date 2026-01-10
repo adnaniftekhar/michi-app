@@ -1,131 +1,135 @@
 'use client'
 
-import { useDemoUser } from '@/contexts/DemoUserContext'
-import { getData, setData } from '@/lib/storage'
-import { useEffect, useState } from 'react'
-import type { Trip } from '@/types'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
+import { useUser } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { CreateTripForm } from '@/components/CreateTripForm'
-import { showToast } from '@/components/ui/Toast'
+import { Card } from '@/components/ui/Card'
 
-export default function Home() {
-  const { currentUserId } = useDemoUser()
-  const [trips, setTrips] = useState<Trip[]>([])
-  const [showForm, setShowForm] = useState(false)
+export default function LoginLanding() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
 
+  // Redirect authenticated users to home
   useEffect(() => {
-    const data = getData(currentUserId)
-    setTrips(data.trips)
-  }, [currentUserId])
-
-  const handleCreateTrip = (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
-    const newTrip: Trip = {
-      id: `trip-${Date.now()}`,
-      ...tripData,
-      learningTarget: {
-        track: '15min',
-      },
-      createdAt: new Date().toISOString(),
+    if (isLoaded && isSignedIn) {
+      router.push('/home')
     }
+  }, [isLoaded, isSignedIn, router])
 
-    const data = getData(currentUserId)
-    data.trips.push(newTrip)
-    setData(currentUserId, data)
-    setTrips([...data.trips])
-    setShowForm(false)
-    showToast('Trip created successfully', 'success')
+  // Show nothing while checking auth or redirecting
+  if (!isLoaded || isSignedIn) {
+    return null
   }
 
-  const formatDateRange = (start: string, end: string) => {
-    const startDate = new Date(start).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    const endDate = new Date(end).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return `${startDate} - ${endDate}`
+  const handleSignIn = () => {
+    router.push('/sign-in')
   }
 
   return (
-    <>
-      <PageHeader
-        title="Trips"
-        subtitle="Plan and manage your learning journeys"
-        action={
-          !showForm && (
-            <Button onClick={() => setShowForm(true)}>Create trip</Button>
-          )
-        }
-      />
-
-      {showForm && (
-        <div style={{ marginBottom: 'var(--spacing-8)' }}>
-          <CreateTripForm
-            onSubmit={handleCreateTrip}
-            onCancel={() => setShowForm(false)}
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--color-background)',
+        padding: 'var(--spacing-6)',
+      }}
+    >
+      <Card
+        style={{
+          maxWidth: '560px',
+          width: '100%',
+          padding: 'var(--spacing-8)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 'var(--spacing-6)',
+          textAlign: 'center',
+          cursor: 'default', // Prevent card hover from interfering with button
+        }}
+      >
+        {/* Michi Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img
+            src="/michi-logo.png"
+            alt="michi"
+            style={{
+              height: '64px',
+              width: 'auto',
+            }}
           />
         </div>
-      )}
 
-      {trips.length === 0 ? (
-        <EmptyState
-          message="No trips yet. Create your first trip to get started."
-          action={
-            !showForm && (
-              <Button onClick={() => setShowForm(true)}>Create trip</Button>
-            )
-          }
-        />
-      ) : (
-        <div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        {/* Title */}
+        <h1
           style={{
-            gap: 'var(--spacing-6)',
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 'var(--font-weight-semibold)',
+            color: 'var(--color-text-primary)',
+            lineHeight: 'var(--line-height-tight)',
+            margin: 0,
           }}
         >
-          {trips.map((trip) => (
-            <Card key={trip.id} href={`/trips/${trip.id}`}>
-              <h2
-                style={{
-                  fontSize: 'var(--font-size-lg)',
-                  lineHeight: 'var(--line-height-tight)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: 'var(--spacing-3)',
-                }}
-              >
-                {trip.title}
-              </h2>
-              <p
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-secondary)',
-                  lineHeight: 'var(--line-height-normal)',
-                  marginBottom: 'var(--spacing-2)',
-                }}
-              >
-                {formatDateRange(trip.startDate, trip.endDate)}
-              </p>
-              <p
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-muted)',
-                  lineHeight: 'var(--line-height-normal)',
-                }}
-              >
-                {trip.baseLocation}
-              </p>
-            </Card>
-          ))}
-        </div>
-      )}
-    </>
+          Welcome to Michi
+        </h1>
+
+        {/* Description */}
+        <p
+          style={{
+            fontSize: 'var(--font-size-base)',
+            color: 'var(--color-text-secondary)',
+            lineHeight: 'var(--line-height-relaxed)',
+            margin: 0,
+            maxWidth: '480px',
+          }}
+        >
+          A worldschooling learning pathfinding app that helps you plan and manage personalized learning journeys for your trips.
+        </p>
+
+        {/* Sign in Button */}
+        <button
+          type="button"
+          onClick={handleSignIn}
+          aria-label="Sign in to Michi"
+          style={{
+            width: '100%',
+            height: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--color-michi-green)',
+            color: 'var(--color-background)',
+            border: 'none',
+            borderRadius: 'var(--radius-button)',
+            fontSize: 'var(--font-size-lg)',
+            fontWeight: 'var(--font-weight-semibold)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-michi-green-hover)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(111, 191, 154, 0.4)'
+            e.currentTarget.style.transform = 'translateY(-1px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-michi-green)'
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)'
+            e.currentTarget.style.transform = 'translateY(0)'
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.outline = '2px solid var(--color-focus-ring)'
+            e.currentTarget.style.outlineOffset = '2px'
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.outline = 'none'
+          }}
+        >
+          Sign in
+        </button>
+      </Card>
+    </div>
   )
 }

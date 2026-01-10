@@ -1,6 +1,6 @@
 'use client'
 
-import { useDemoUser } from '@/contexts/DemoUserContext'
+import { useUser } from '@clerk/nextjs'
 import { getData, setData } from '@/lib/storage'
 import { generateScheduleBlocks } from '@/lib/schedule-generator'
 import { useEffect, useState } from 'react'
@@ -31,37 +31,85 @@ import { TripHeader } from '@/components/trips/TripHeader'
 export default function TripDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { currentUserId, currentUser } = useDemoUser()
+  const { isSignedIn, isLoaded } = useUser()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [scheduleBlocks, setScheduleBlocks] = useState<ScheduleBlock[]>([])
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
   const [isEditingTrip, setIsEditingTrip] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const tripId = params.id as string
 
+  // Fetch trip from API
   useEffect(() => {
-    const data = getData(currentUserId)
-    const foundTrip = data.trips.find((t) => t.id === tripId)
-    if (!foundTrip) {
+    if (!isLoaded) return
+
+    if (!isSignedIn) {
       router.push('/')
       return
     }
-    setTrip(foundTrip)
-    setScheduleBlocks(data.scheduleBlocks[tripId] || [])
-    setActivityLogs(data.activityLogs[tripId] || [])
-  }, [currentUserId, tripId, router])
 
-  const saveData = (updatedBlocks?: ScheduleBlock[], updatedLogs?: ActivityLog[], updatedTripData?: Trip) => {
-    const data = getData(currentUserId)
-    const tripToSave = updatedTripData || trip
-    if (tripToSave) {
-      const index = data.trips.findIndex((t) => t.id === tripId)
-      if (index >= 0) {
-        data.trips[index] = tripToSave
+    const fetchTrip = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/trips/${tripId}`)
+        if (!response.ok) {
+          if (response.status === 404) {
+            router.push('/home')
+            return
+          }
+          throw new Error('Failed to fetch trip')
+        }
+        const data = await response.json()
+        setTrip(data.trip)
+
+        // Schedule blocks and activity logs are still stored in localStorage
+        // TODO: Move these to API routes as well
+        const localData = getData('current') // Use a placeholder key for now
+        setScheduleBlocks(localData.scheduleBlocks[tripId] || [])
+        setActivityLogs(localData.activityLogs[tripId] || [])
+      } catch (error) {
+        console.error('Failed to fetch trip:', error)
+        showToast('Failed to load trip', 'error')
+        router.push('/home')
+      } finally {
+        setIsLoading(false)
       }
-      data.scheduleBlocks[tripId] = updatedBlocks !== undefined ? updatedBlocks : scheduleBlocks
-      data.activityLogs[tripId] = updatedLogs !== undefined ? updatedLogs : activityLogs
-      setData(currentUserId, data)
+    }
+
+    fetchTrip()
+  }, [isLoaded, isSignedIn, tripId, router])
+
+  const saveData = async (updatedBlocks?: ScheduleBlock[], updatedLogs?: ActivityLog[], updatedTripData?: Trip) => {
+    // Save schedule blocks and logs to localStorage (for now)
+    const localData = getData('current')
+    if (updatedBlocks !== undefined) {
+      localData.scheduleBlocks[tripId] = updatedBlocks
+    }
+    if (updatedLogs !== undefined) {
+      localData.activityLogs[tripId] = updatedLogs
+    }
+    setData('current', localData)
+
+    // Save trip to API if updated
+    if (updatedTripData && trip) {
+      try {
+        const response = await fetch(`/api/trips/${tripId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedTripData),
+        })
+        if (!response.ok) {
+          throw new Error('Failed to update trip')
+        }
+        const data = await response.json()
+        setTrip(data.trip)
+      } catch (error) {
+        console.error('Failed to update trip:', error)
+        showToast('Failed to update trip', 'error')
+      }
     }
   }
 
@@ -89,24 +137,24 @@ export default function TripDetailPage() {
     saveData(undefined, newLogs)
   }
 
-  const updateTrip = (updatedTrip: Trip) => {
+  const updateTrip = async (updatedTrip: Trip) => {
     setTrip(updatedTrip)
-    saveData(undefined, undefined, updatedTrip)
+    await saveData(undefined, undefined, updatedTrip)
   }
 
-  const handleEditTrip = (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
+  const handleEditTrip = async (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
     if (trip) {
       const updatedTrip: Trip = {
         ...trip,
         ...tripData,
       }
-      updateTrip(updatedTrip)
+      await updateTrip(updatedTrip)
       setIsEditingTrip(false)
       showToast('Trip updated successfully', 'success')
     }
   }
 
-  if (!trip) {
+  if (isLoading || !trip) {
     return (
       <div
         className="text-center py-12"
@@ -117,7 +165,9 @@ export default function TripDetailPage() {
     )
   }
 
-  const timezoneLabel = `Local time: ${currentUser.timezone}`
+  // Get timezone from user settings or default
+  const timezone = 'America/New_York' // TODO: Get from user settings
+  const timezoneLabel = `Local time: ${timezone}`
 
   return (
     <>
@@ -157,7 +207,7 @@ export default function TripDetailPage() {
                 scheduleBlocks={scheduleBlocks}
                 onScheduleUpdate={updateScheduleBlocks}
                 onTripUpdate={updateTrip}
-                timezone={currentUser.timezone}
+                timezone={timezone}
               />
             ),
           },
@@ -168,7 +218,7 @@ export default function TripDetailPage() {
               <LogsTab
                 activityLogs={activityLogs}
                 onUpdate={updateActivityLogs}
-                timezone={currentUser.timezone}
+                timezone={timezone}
               />
             ),
           },

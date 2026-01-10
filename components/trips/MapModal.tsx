@@ -13,12 +13,18 @@ interface MapModalProps {
 }
 
 /**
- * Gets a static map image URL using OpenStreetMap
- * Privacy-focused: uses city-level coordinates only
+ * Gets a static map image URL using Google Static Maps API
+ * Falls back to OpenStreetMap if no API key is available
  */
-function getStaticMapUrl(lat: number, lng: number, location: string): string {
-  // Using OpenStreetMap static map (no API key required, privacy-friendly)
-  // Format: https://staticmap.openstreetmap.de/staticmap.php?center=lat,lng&zoom=12&size=600x400&markers=lat,lng
+function getStaticMapUrl(lat: number, lng: number, location: string, mapsKey?: string | null): string {
+  if (mapsKey) {
+    // Use Google Static Maps API
+    const size = '600x400'
+    const zoom = 12
+    const marker = `${lat},${lng}`
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}&markers=color:0x6FBF9A|${marker}&key=${mapsKey}`
+  }
+  // Fallback to OpenStreetMap if no API key
   return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=12&size=600x400&markers=${lat},${lng},red`
 }
 
@@ -432,7 +438,7 @@ export function MapModal({ isOpen, onClose, location, activityTitle, coordinates
               }}
             >
               <img
-                src={getStaticMapUrl(coords.lat, coords.lng, location)}
+                src={getStaticMapUrl(coords.lat, coords.lng, location, mapsKey)}
                 alt={`Map showing ${location}`}
                 style={{
                   width: '100%',
@@ -443,9 +449,17 @@ export function MapModal({ isOpen, onClose, location, activityTitle, coordinates
                   border: '1px solid var(--color-border)',
                 }}
                 onError={(e) => {
-                  // If static map fails to load, show error state
+                  // If static map fails to load, show placeholder
                   const target = e.currentTarget as HTMLImageElement
                   target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent && !parent.querySelector('.map-placeholder')) {
+                    const placeholder = document.createElement('div')
+                    placeholder.className = 'map-placeholder'
+                    placeholder.style.cssText = 'width: 100%; max-width: 600px; height: 400px; display: flex; align-items: center; justify-content: center; background: var(--color-surface); border-radius: var(--radius-sm); color: var(--color-text-secondary); flex-direction: column; gap: var(--spacing-2);'
+                    placeholder.innerHTML = '<div style="font-size: 2rem;">🗺️</div><div>Map preview unavailable</div>'
+                    parent.appendChild(placeholder)
+                  }
                 }}
               />
             </div>

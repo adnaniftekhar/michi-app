@@ -13,7 +13,7 @@ export function TripHeader({ tripName, sectionName }: TripHeaderProps) {
 
   const handleBackToTrips = () => {
     // Always navigate to trips list, regardless of history
-    router.push('/')
+    router.push('/home')
   }
 
   const breadcrumbItems = ['Trips', tripName]

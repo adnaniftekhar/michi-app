@@ -118,21 +118,23 @@ export async function POST(request: Request) {
     }
 
     // Save to Clerk - pass entire metadata object
-    // Retry logic for production reliability
-    let lastError: any = null
+    // Retry logic for production reliability (handles transient network issues)
     const maxRetries = 3
+    let metadataError: any = null
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         await client.users.updateUserMetadata(userId, {
           privateMetadata: newMetadata,
         })
         console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id, `(attempt ${attempt})`)
+        metadataError = null // Clear error on success
         break // Success, exit retry loop
-      } catch (metadataError) {
-        lastError = metadataError
-        const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError)
+      } catch (error) {
+        metadataError = error
+        const errorMessage = error instanceof Error ? error.message : String(error)
         
-        // Don't retry on certain errors
+        // Don't retry on certain errors (size limits, permissions)
         if (
           errorMessage.includes('size') || 
           errorMessage.includes('limit') || 
@@ -141,7 +143,7 @@ export async function POST(request: Request) {
           errorMessage.includes('403') ||
           errorMessage.includes('401')
         ) {
-          throw metadataError // Don't retry, throw immediately
+          throw error // Don't retry, throw immediately
         }
         
         // Retry on network/timeout errors
@@ -152,15 +154,14 @@ export async function POST(request: Request) {
           })
           await new Promise(resolve => setTimeout(resolve, delay))
         } else {
-          // Last attempt failed
-          throw metadataError
+          // Last attempt failed, will be handled below
+          break
         }
       }
     }
     
-    // If we get here and lastError exists, something went wrong
-    if (lastError) {
-      const metadataError = lastError
+    // If metadataError exists, all retries failed
+    if (metadataError) {
       const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError)
       const errorName = metadataError instanceof Error ? metadataError.name : 'UnknownError'
       

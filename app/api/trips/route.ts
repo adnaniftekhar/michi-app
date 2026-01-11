@@ -46,7 +46,43 @@ export async function POST(request: Request) {
       )
     }
 
-    const body = await request.json()
+    // Parse request body - catch Next.js runtime parsing errors
+    let body: any
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      // Next.js runtime sometimes throws "Unprocessable Entity" before our handler
+      const errorMsg = parseError instanceof Error ? parseError.message : String(parseError)
+      console.error('[Trips API] Request body parse error:', errorMsg)
+      
+      // If it's the Next.js "Unprocessable Entity" error, try reading as text and parsing manually
+      if (errorMsg.includes('Unprocessable Entity') || errorMsg.includes('UnprocessableEntity')) {
+        try {
+          const bodyText = await request.text()
+          if (bodyText) {
+            body = JSON.parse(bodyText)
+            console.log('[Trips API] Successfully parsed body after Next.js error')
+          } else {
+            return NextResponse.json(
+              { error: 'Request body is empty' },
+              { status: 400 }
+            )
+          }
+        } catch (manualParseError) {
+          console.error('[Trips API] Manual parse also failed:', manualParseError)
+          return NextResponse.json(
+            { error: 'Invalid JSON in request body', details: errorMsg },
+            { status: 400 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid JSON in request body', details: errorMsg },
+          { status: 400 }
+        )
+      }
+    }
+
     const { title, startDate, endDate, baseLocation, learningTarget } = body
 
     if (!title || !startDate || !endDate || !baseLocation) {

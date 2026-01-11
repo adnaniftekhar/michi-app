@@ -1,7 +1,7 @@
 import type { DemoUser, LearnerProfile } from '@/types'
 
 const CUSTOM_USERS_KEY = 'travel_learner_custom_users'
-const CUSTOM_PROFILES_KEY = 'travel_learner_custom_profiles'
+export const CUSTOM_PROFILES_KEY = 'travel_learner_custom_profiles'
 
 export function getCustomUsers(): DemoUser[] {
   if (typeof window === 'undefined') return []

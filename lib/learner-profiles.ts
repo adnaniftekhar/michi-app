@@ -1,5 +1,10 @@
+/**
+ * Learner profile management
+ * Provides both sync and async functions to retrieve learner profiles
+ * Supports demo users (localStorage) and authenticated users (API)
+ */
 import type { LearnerProfile, DemoUserId } from '@/types'
-import { getCustomProfile } from './custom-users'
+import { getCustomProfile, getCustomProfiles, CUSTOM_PROFILES_KEY } from './custom-users'
 
 export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   alice: {

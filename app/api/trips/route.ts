@@ -14,6 +14,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30 // 30 seconds max
 
+// CRITICAL: Prevent Next.js from pre-parsing the body
+// This is needed to avoid "Unprocessable Entity" errors in production
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
 // GET /api/trips - Get all trips for the current user
 export async function GET() {
   try {
@@ -287,11 +292,11 @@ export async function POST(request: Request) {
 
     // Create new trip record
     const tripRecord = createTripRecord({
-      title,
-      startDate,
-      endDate,
-      baseLocation,
-      learningTarget,
+        title,
+        startDate,
+        endDate,
+        baseLocation,
+        learningTarget,
     })
 
     console.log(`[Trips API] [${requestId}] Created trip record:`, {
@@ -455,7 +460,7 @@ export async function POST(request: Request) {
     
     // Check for specific Clerk errors
     if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
-      return NextResponse.json(
+    return NextResponse.json(
         { error: 'Unauthorized - please sign in to create trips', details: errorMessage, requestId },
         { status: 401 }
       )

@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
     // Save to Clerk user metadata
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
-        ...user.privateMetadata,
+        ...(user.privateMetadata || {}),
         scheduleBlocks: updatedBlocks,
       },
     })
@@ -97,6 +97,11 @@ export async function PUT(request: Request) {
     })
   } catch (error) {
     console.error('[user/schedule-blocks] ❌ Error saving schedule blocks:', error)
+    console.error('[user/schedule-blocks] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    })
     return NextResponse.json(
       { error: 'Failed to save schedule blocks', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }

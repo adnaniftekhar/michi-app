@@ -2,6 +2,7 @@
 
 import { useUser } from '@clerk/nextjs'
 import { getData, setData } from '@/lib/storage'
+import { useDemoUser } from '@/contexts/DemoUserContext'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type {
@@ -32,6 +33,7 @@ export default function TripDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { isSignedIn, isLoaded } = useUser()
+  const { currentUserId } = useDemoUser()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [scheduleBlocks, setScheduleBlocks] = useState<ScheduleBlock[]>([])
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
@@ -93,8 +95,8 @@ export default function TripDetailPage() {
                   tripId,
                   fetchedTrip.baseLocation
                 )
-                // Save converted blocks to API for future use
-                if (apiBlocks.length > 0 && isSignedIn) {
+                // Save converted blocks to API for future use (only for Clerk users)
+                if (apiBlocks.length > 0 && currentUserId.startsWith('user_')) {
                   try {
                     await fetch('/api/user/schedule-blocks', {
                       method: 'PUT',
@@ -160,8 +162,9 @@ export default function TripDetailPage() {
     }
     setData('current', localData)
 
-    // Save schedule blocks to API if user is authenticated (Clerk user ID from useUser)
-    if (updatedBlocks !== undefined && isSignedIn) {
+    // Save schedule blocks to API if user is authenticated (Clerk user ID starts with 'user_')
+    // Only save to API for real Clerk users, not demo users
+    if (updatedBlocks !== undefined && currentUserId.startsWith('user_')) {
       try {
         const response = await fetch('/api/user/schedule-blocks', {
           method: 'PUT',
@@ -173,14 +176,32 @@ export default function TripDetailPage() {
         })
         
         if (!response.ok) {
-          const error = await response.json()
-          console.error('[saveData] Failed to save schedule blocks to API:', error)
+          let errorMessage = 'Unknown error'
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorData.details || JSON.stringify(errorData)
+          } catch {
+            // If response is not JSON, try to get text
+            try {
+              errorMessage = await response.text() || `HTTP ${response.status} ${response.statusText}`
+            } catch {
+              errorMessage = `HTTP ${response.status} ${response.statusText}`
+            }
+          }
+          console.error('[saveData] Failed to save schedule blocks to API:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorMessage,
+          })
           // Don't block the UI if saving fails
         } else {
           console.log('[saveData] ✅ Schedule blocks saved to API for trip:', tripId)
         }
       } catch (error) {
-        console.error('[saveData] Error saving schedule blocks to API:', error)
+        console.error('[saveData] Error saving schedule blocks to API:', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        })
         // Don't block the UI if saving fails
       }
     }

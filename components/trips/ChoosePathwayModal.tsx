@@ -345,8 +345,7 @@ export function ChoosePathwayModal({
 
   const datesSummary = selectedDates
     .map((date, idx) => {
-      const d = new Date(date)
-      return `Day ${idx + 1}: ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      return `Day ${idx + 1}`
     })
     .join(', ')
 
@@ -601,8 +600,7 @@ export function ChoosePathwayModal({
                     borderRadius: 'var(--radius-sm)',
                   }}
                 >
-                  {allTripDates.current.map((date) => {
-                    const d = new Date(date)
+                  {allTripDates.current.map((date, idx) => {
                     return (
                       <label
                         key={date}
@@ -622,7 +620,7 @@ export function ChoosePathwayModal({
                           }}
                         />
                         <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
-                          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          Day {idx + 1}
                         </span>
                       </label>
                     )

@@ -201,7 +201,7 @@ export function LearningPathwayOptionsModal({
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {trip.title} • {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
+              {trip.title} • {tripDates.length} days
             </p>
           </div>
           <button
@@ -345,7 +345,7 @@ export function LearningPathwayOptionsModal({
                           style={{ accentColor: 'var(--color-michi-green)' }}
                         />
                         <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)' }}>
-                          {formatDateShort(date)}
+                          Day {tripDates.indexOf(date) + 1}
                         </span>
                       </label>
                     ))}

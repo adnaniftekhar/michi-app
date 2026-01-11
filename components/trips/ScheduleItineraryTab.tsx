@@ -491,47 +491,8 @@ export function ScheduleItineraryTab({
 
     onScheduleUpdate(updated)
     
-    // Save pathway and schedule blocks to API if user is authenticated (Clerk user ID starts with 'user_')
-    if (currentUserId.startsWith('user_')) {
-      try {
-        // Save pathway
-        const pathwayResponse = await fetch('/api/user/pathways', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tripId: trip.id,
-            pathway: finalPlan,
-          }),
-        })
-        
-        if (!pathwayResponse.ok) {
-          const error = await pathwayResponse.json()
-          console.error('[handleFinalizePathway] Failed to save pathway to API:', error)
-        } else {
-          console.log('[handleFinalizePathway] ✅ Pathway saved to API for trip:', trip.id)
-        }
-
-        // Also save schedule blocks to API for direct access
-        const blocksResponse = await fetch('/api/user/schedule-blocks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tripId: trip.id,
-            scheduleBlocks: updated,
-          }),
-        })
-        
-        if (!blocksResponse.ok) {
-          const error = await blocksResponse.json()
-          console.error('[handleFinalizePathway] Failed to save schedule blocks to API:', error)
-        } else {
-          console.log('[handleFinalizePathway] ✅ Schedule blocks saved to API for trip:', trip.id)
-        }
-      } catch (error) {
-        console.error('[handleFinalizePathway] Error saving to API:', error)
-        // Don't block the UI if saving fails
-      }
-    }
+    // Data is saved via onScheduleUpdate callback (localStorage)
+    console.log('[handleFinalizePathway] ✅ Schedule updated for trip:', trip.id)
     
     showToast(`Added ${newBlocks.length} activities to your schedule`, 'success')
   }
@@ -783,81 +744,8 @@ export function ScheduleItineraryTab({
     
     onScheduleUpdate(updated)
 
-    // Save pathway to API if user is authenticated (Clerk user ID starts with 'user_')
-    // Convert AIPlanResponse to FinalPathwayPlan format for saving
-    if (currentUserId.startsWith('user_')) {
-      try {
-        // Convert draft to FinalPathwayPlan format
-        const finalPlan: FinalPathwayPlan = {
-          days: draft.days.map((day, index) => {
-            // Calculate the actual date for this day
-            const dayDate = new Date(startDate)
-            dayDate.setDate(startDate.getDate() + (day.day - 1))
-            const actualDate = (day as any)._mappedDate || dayDate.toISOString().split('T')[0]
-            
-            return {
-              day: day.day,
-              date: actualDate,
-              drivingQuestion: day.drivingQuestion,
-              fieldExperience: day.fieldExperience,
-              inquiryTask: day.inquiryTask,
-              artifact: day.artifact,
-              reflectionPrompt: day.reflectionPrompt,
-              critiqueStep: day.critiqueStep,
-              scheduleBlocks: day.scheduleBlocks.map((block) => {
-                // Map the block to include localOptions if available
-                const enrichedBlock = block as any
-                return {
-                  startTime: block.startTime,
-                  duration: block.duration,
-                  title: block.title,
-                  description: block.description,
-                  localOptions: enrichedBlock.localOptions,
-                }
-              }),
-            }
-          }),
-          summary: (draft as any).summary,
-        }
-
-        // Save pathway
-        const pathwayResponse = await fetch('/api/user/pathways', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tripId: trip.id,
-            pathway: finalPlan,
-          }),
-        })
-        
-        if (!pathwayResponse.ok) {
-          const error = await pathwayResponse.json()
-          console.error('[handleApplyAIPathway] Failed to save pathway to API:', error)
-        } else {
-          console.log('[handleApplyAIPathway] ✅ Pathway saved to API for trip:', trip.id)
-        }
-
-        // Also save schedule blocks to API for direct access
-        const blocksResponse = await fetch('/api/user/schedule-blocks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tripId: trip.id,
-            scheduleBlocks: updated,
-          }),
-        })
-        
-        if (!blocksResponse.ok) {
-          const error = await blocksResponse.json()
-          console.error('[handleApplyAIPathway] Failed to save schedule blocks to API:', error)
-        } else {
-          console.log('[handleApplyAIPathway] ✅ Schedule blocks saved to API for trip:', trip.id)
-        }
-      } catch (error) {
-        console.error('[handleApplyAIPathway] Error saving to API:', error)
-        // Don't block the UI if saving fails
-      }
-    }
+    // Data is saved via onScheduleUpdate callback (localStorage)
+    console.log('[handleApplyAIPathway] ✅ Schedule updated for trip:', trip.id)
 
     setShowAIModal(false)
     showToast(`AI pathway applied: ${newBlocks.length} activities added`, 'success')

@@ -9,15 +9,6 @@ import {
 } from '@/lib/trips-storage-clerk'
 import type { Trip } from '@/types'
 
-// Export route config to ensure proper handling
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
-export const maxDuration = 30 // 30 seconds max
-
-// CRITICAL: Prevent Next.js from pre-parsing the body
-// This is needed to avoid "Unprocessable Entity" errors in production
-export const fetchCache = 'force-no-store'
-export const revalidate = 0
 
 // GET /api/trips - Get all trips for the current user
 export async function GET() {

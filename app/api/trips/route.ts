@@ -419,16 +419,33 @@ export async function POST(request: Request) {
     console.log(`[Trips API] [${requestId}] ✅ SUCCESS: Trip created and saved`)
     return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorName = error instanceof Error ? error.name : 'UnknownError'
+    
     console.error('[Trips API] POST error:', error)
     console.error('[Trips API] POST error details:', {
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
+      name: errorName,
       stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
     })
+    
+    // Check if this is a validation/Unprocessable Entity error - return 422, not 500
+    if (errorMessage.includes('Unprocessable Entity') || errorMessage.includes('UnprocessableEntity') || errorName === 'UnprocessableEntity') {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed',
+          details: 'Unprocessable Entity',
+          validationErrors: [errorMessage] // Include the actual error message
+        },
+        { status: 422 }
+      )
+    }
+    
+    // For other errors, return 500
     return NextResponse.json(
       { 
         error: 'Failed to create trip',
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     )

@@ -339,7 +339,7 @@ describe('/api/trips', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
-      expect(data.error).toBe('Failed to create trip')
+      expect(data.error).toBe('Failed to fetch user from Clerk')
     })
   })
 })

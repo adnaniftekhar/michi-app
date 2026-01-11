@@ -37,31 +37,121 @@ export async function GET() {
 
 // POST /api/trips - Create a new trip
 export async function POST(request: Request) {
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  console.log(`[Trips API] [${requestId}] POST request received`)
+  
   try {
-    const { userId } = await auth()
-    if (!userId) {
+    // Step 1: Authenticate user
+    console.log(`[Trips API] [${requestId}] Step 1: Authenticating user...`)
+    let userId: string | null = null
+    try {
+      const authResult = await auth()
+      userId = authResult.userId
+      console.log(`[Trips API] [${requestId}] Auth result:`, { 
+        hasUserId: !!userId, 
+        userId: userId ? userId.substring(0, 10) + '...' : 'null' 
+      })
+    } catch (authError) {
+      console.error(`[Trips API] [${requestId}] ❌ Auth error:`, {
+        error: authError instanceof Error ? authError.message : String(authError),
+        name: authError instanceof Error ? authError.name : 'Unknown',
+        stack: authError instanceof Error ? authError.stack : undefined,
+      })
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Authentication failed', details: authError instanceof Error ? authError.message : String(authError) },
+        { status: 401 }
+      )
+    }
+    
+    if (!userId) {
+      console.error(`[Trips API] [${requestId}] ❌ No userId after auth`)
+      return NextResponse.json(
+        { error: 'Unauthorized - no user ID' },
         { status: 401 }
       )
     }
 
-    const body = await request.json()
+    // Step 2: Parse request body
+    console.log(`[Trips API] [${requestId}] Step 2: Parsing request body...`)
+    let body: any
+    try {
+      body = await request.json()
+      console.log(`[Trips API] [${requestId}] Request body parsed:`, {
+        hasTitle: !!body.title,
+        hasStartDate: !!body.startDate,
+        hasEndDate: !!body.endDate,
+        hasBaseLocation: !!body.baseLocation,
+        title: body.title,
+      })
+    } catch (parseError) {
+      console.error(`[Trips API] [${requestId}] ❌ JSON parse error:`, parseError)
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      )
+    }
+    
     const { title, startDate, endDate, baseLocation, learningTarget } = body
 
-    // Validate required fields
+    // Step 3: Validate required fields
+    console.log(`[Trips API] [${requestId}] Step 3: Validating required fields...`)
     if (!title || !startDate || !endDate || !baseLocation) {
+      console.error(`[Trips API] [${requestId}] ❌ Missing required fields:`, {
+        hasTitle: !!title,
+        hasStartDate: !!startDate,
+        hasEndDate: !!endDate,
+        hasBaseLocation: !!baseLocation,
+      })
       return NextResponse.json(
         { error: 'Missing required fields: title, startDate, endDate, baseLocation' },
         { status: 400 }
       )
     }
 
-    // Get existing trips from Clerk
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
+    // Step 4: Initialize Clerk client
+    console.log(`[Trips API] [${requestId}] Step 4: Initializing Clerk client...`)
+    let client: any
+    try {
+      client = await clerkClient()
+      console.log(`[Trips API] [${requestId}] Clerk client initialized`)
+    } catch (clientError) {
+      console.error(`[Trips API] [${requestId}] ❌ Clerk client initialization error:`, {
+        error: clientError instanceof Error ? clientError.message : String(clientError),
+        name: clientError instanceof Error ? clientError.name : 'Unknown',
+        stack: clientError instanceof Error ? clientError.stack : undefined,
+      })
+      return NextResponse.json(
+        { error: 'Failed to initialize Clerk client', details: clientError instanceof Error ? clientError.message : String(clientError) },
+        { status: 500 }
+      )
+    }
+
+    // Step 5: Get user from Clerk
+    console.log(`[Trips API] [${requestId}] Step 5: Fetching user from Clerk...`)
+    let user: any
+    try {
+      user = await client.users.getUser(userId)
+      console.log(`[Trips API] [${requestId}] User fetched:`, {
+        hasUser: !!user,
+        hasMetadata: !!user?.privateMetadata,
+        metadataKeys: user?.privateMetadata ? Object.keys(user.privateMetadata) : [],
+      })
+    } catch (getUserError) {
+      console.error(`[Trips API] [${requestId}] ❌ Get user error:`, {
+        error: getUserError instanceof Error ? getUserError.message : String(getUserError),
+        name: getUserError instanceof Error ? getUserError.name : 'Unknown',
+        stack: getUserError instanceof Error ? getUserError.stack : undefined,
+        userId,
+      })
+      return NextResponse.json(
+        { error: 'Failed to fetch user from Clerk', details: getUserError instanceof Error ? getUserError.message : String(getUserError) },
+        { status: 500 }
+      )
+    }
     
-    console.log('[Trips API] User metadata before update:', {
+    // Step 6: Process trip data
+    console.log(`[Trips API] [${requestId}] Step 6: Processing trip data...`)
+    console.log(`[Trips API] [${requestId}] User metadata before update:`, {
       hasMetadata: !!user.privateMetadata,
       metadataKeys: user.privateMetadata ? Object.keys(user.privateMetadata) : [],
       existingTripsCount: getTripRecordsFromMetadata(user.privateMetadata).length,
@@ -78,7 +168,7 @@ export async function POST(request: Request) {
       learningTarget,
     })
 
-    console.log('[Trips API] Created trip record:', {
+    console.log(`[Trips API] [${requestId}] Created trip record:`, {
       id: tripRecord.id,
       title: tripRecord.trip.title,
     })
@@ -86,7 +176,7 @@ export async function POST(request: Request) {
     // Update trips in metadata
     const updatedTrips = updateTripsData(existingTrips, tripRecord)
     
-    console.log('[Trips API] Updated trips count:', updatedTrips.length)
+    console.log(`[Trips API] [${requestId}] Updated trips count:`, updatedTrips.length)
 
     // Prepare metadata - ensure we preserve ALL existing metadata
     const existingMetadata = user.privateMetadata || {}
@@ -102,7 +192,7 @@ export async function POST(request: Request) {
     const metadataSize = metadataString.length
     const metadataSizeKB = (metadataSize / 1024).toFixed(2)
     
-    console.log('[Trips API] Metadata to save:', {
+    console.log(`[Trips API] [${requestId}] Metadata to save:`, {
       keys: Object.keys(newMetadata),
       tripsCount: Array.isArray(newMetadata.trips) ? newMetadata.trips.length : 'not array',
       hasPathways: !!newMetadata.pathways,
@@ -114,25 +204,35 @@ export async function POST(request: Request) {
     // Clerk has a metadata size limit (typically 10KB for privateMetadata)
     // Warn if approaching limit
     if (metadataSize > 8000) {
-      console.warn('[Trips API] ⚠️ Metadata size is large:', `${metadataSizeKB} KB. Clerk limit is ~10KB`)
+      console.warn(`[Trips API] [${requestId}] ⚠️ Metadata size is large:`, `${metadataSizeKB} KB. Clerk limit is ~10KB`)
     }
 
-    // Save to Clerk - pass entire metadata object
+    // Step 7: Save to Clerk - pass entire metadata object
+    console.log(`[Trips API] [${requestId}] Step 7: Saving to Clerk metadata...`)
     // Retry logic for production reliability (handles transient network issues)
     const maxRetries = 3
     let metadataError: any = null
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        console.log(`[Trips API] [${requestId}] Attempt ${attempt}/${maxRetries}: Updating user metadata...`)
         await client.users.updateUserMetadata(userId, {
           privateMetadata: newMetadata,
         })
-        console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id, `(attempt ${attempt})`)
+        console.log(`[Trips API] [${requestId}] ✅ Trip created and saved to Clerk:`, tripRecord.id, `(attempt ${attempt})`)
         metadataError = null // Clear error on success
         break // Success, exit retry loop
       } catch (error) {
         metadataError = error
         const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorName = error instanceof Error ? error.name : 'UnknownError'
+        const errorStack = error instanceof Error ? error.stack : undefined
+        
+        console.error(`[Trips API] [${requestId}] ❌ Metadata update attempt ${attempt} failed:`, {
+          error: errorMessage,
+          name: errorName,
+          stack: errorStack,
+        })
         
         // Don't retry on certain errors (size limits, permissions)
         if (
@@ -143,18 +243,18 @@ export async function POST(request: Request) {
           errorMessage.includes('403') ||
           errorMessage.includes('401')
         ) {
+          console.error(`[Trips API] [${requestId}] ❌ Non-retryable error, throwing immediately`)
           throw error // Don't retry, throw immediately
         }
         
         // Retry on network/timeout errors
         if (attempt < maxRetries) {
           const delay = attempt * 500 // Exponential backoff: 500ms, 1000ms, 1500ms
-          console.warn(`[Trips API] ⚠️ Metadata update failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`, {
-            error: errorMessage,
-          })
+          console.warn(`[Trips API] [${requestId}] ⚠️ Retrying in ${delay}ms...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         } else {
           // Last attempt failed, will be handled below
+          console.error(`[Trips API] [${requestId}] ❌ All ${maxRetries} attempts failed`)
           break
         }
       }
@@ -165,8 +265,8 @@ export async function POST(request: Request) {
       const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError)
       const errorName = metadataError instanceof Error ? metadataError.name : 'UnknownError'
       
-      console.error('[Trips API] ❌ Error updating user metadata:', metadataError)
-      console.error('[Trips API] Metadata update error details:', {
+      console.error(`[Trips API] [${requestId}] ❌ Final error updating user metadata:`, metadataError)
+      console.error(`[Trips API] [${requestId}] Metadata update error details:`, {
         message: errorMessage,
         name: errorName,
         userId,
@@ -177,6 +277,7 @@ export async function POST(request: Request) {
         hasScheduleBlocks: !!newMetadata.scheduleBlocks,
         pathwaysKeys: newMetadata.pathways ? Object.keys(newMetadata.pathways).length : 0,
         scheduleBlocksKeys: newMetadata.scheduleBlocks ? Object.keys(newMetadata.scheduleBlocks).length : 0,
+        fullError: String(metadataError),
       })
       
       // Provide more specific error messages for common issues
@@ -193,9 +294,21 @@ export async function POST(request: Request) {
       throw metadataError
     }
 
+    console.log(`[Trips API] [${requestId}] ✅ SUCCESS: Trip created and saved`)
     return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
-    console.error('[Trips API] POST error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorName = error instanceof Error ? error.name : 'UnknownError'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error(`[Trips API] [${requestId}] ❌❌❌ TOP-LEVEL ERROR:`, {
+      message: errorMessage,
+      name: errorName,
+      stack: errorStack,
+      fullError: String(error),
+      errorType: typeof error,
+      errorConstructor: error?.constructor?.name,
+    })
     
     // Try to get userId for logging (might fail if auth error)
     let userIdForLogging = 'unknown'
@@ -206,18 +319,18 @@ export async function POST(request: Request) {
       userIdForLogging = 'auth-error'
     }
     
-    console.error('[Trips API] POST error details:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
+    console.error(`[Trips API] [${requestId}] Final error details:`, {
+      requestId,
+      message: errorMessage,
+      stack: errorStack,
+      name: errorName,
       userId: userIdForLogging,
     })
     
     // Check for specific Clerk errors
-    const errorMessage = error instanceof Error ? error.message : String(error)
     if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
       return NextResponse.json(
-        { error: 'Unauthorized - please sign in to create trips' },
+        { error: 'Unauthorized - please sign in to create trips', details: errorMessage },
         { status: 401 }
       )
     }
@@ -226,6 +339,7 @@ export async function POST(request: Request) {
       { 
         error: 'Failed to create trip',
         details: errorMessage,
+        requestId, // Include request ID for debugging
       },
       { status: 500 }
     )

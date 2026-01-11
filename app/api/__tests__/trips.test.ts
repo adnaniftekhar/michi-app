@@ -105,7 +105,7 @@ describe('/api/trips', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error).toBe('Unauthorized - no user ID')
     })
 
     it('should return 400 if required fields are missing', async () => {

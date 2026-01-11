@@ -60,6 +60,13 @@ export async function POST(request: Request) {
     // Get existing trips from Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
+    
+    console.log('[Trips API] User metadata before update:', {
+      hasMetadata: !!user.privateMetadata,
+      metadataKeys: user.privateMetadata ? Object.keys(user.privateMetadata) : [],
+      existingTripsCount: getTripRecordsFromMetadata(user.privateMetadata).length,
+    })
+    
     const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
 
     // Create new trip record
@@ -71,31 +78,84 @@ export async function POST(request: Request) {
       learningTarget,
     })
 
-    // Update trips in metadata
-    const updatedTrips = updateTripsData(existingTrips, tripRecord)
-
-    // Save to Clerk
-    await client.users.updateUserMetadata(userId, {
-      privateMetadata: {
-        ...(user.privateMetadata || {}),
-        ...tripsDataToMetadata(updatedTrips),
-      },
+    console.log('[Trips API] Created trip record:', {
+      id: tripRecord.id,
+      title: tripRecord.trip.title,
     })
 
-    console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id)
+    // Update trips in metadata
+    const updatedTrips = updateTripsData(existingTrips, tripRecord)
+    
+    console.log('[Trips API] Updated trips count:', updatedTrips.length)
+
+    // Prepare metadata - ensure we preserve ALL existing metadata
+    const existingMetadata = user.privateMetadata || {}
+    const tripsMetadata = tripsDataToMetadata(updatedTrips)
+    
+    const newMetadata = {
+      ...existingMetadata,
+      ...tripsMetadata,
+    }
+    
+    console.log('[Trips API] Metadata to save:', {
+      keys: Object.keys(newMetadata),
+      tripsCount: Array.isArray(newMetadata.trips) ? newMetadata.trips.length : 'not array',
+      hasPathways: !!newMetadata.pathways,
+      hasScheduleBlocks: !!newMetadata.scheduleBlocks,
+    })
+
+    // Save to Clerk - pass entire metadata object
+    try {
+      await client.users.updateUserMetadata(userId, {
+        privateMetadata: newMetadata,
+      })
+      console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id)
+    } catch (metadataError) {
+      console.error('[Trips API] ❌ Error updating user metadata:', metadataError)
+      console.error('[Trips API] Metadata update error details:', {
+        message: metadataError instanceof Error ? metadataError.message : String(metadataError),
+        stack: metadataError instanceof Error ? metadataError.stack : undefined,
+        name: metadataError instanceof Error ? metadataError.name : undefined,
+        userId,
+        metadataSize: JSON.stringify(newMetadata).length,
+        tripsCount: updatedTrips.length,
+      })
+      throw metadataError
+    }
 
     return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
     console.error('[Trips API] POST error:', error)
+    
+    // Try to get userId for logging (might fail if auth error)
+    let userIdForLogging = 'unknown'
+    try {
+      const authResult = await auth()
+      userIdForLogging = authResult.userId || 'no-user-id'
+    } catch {
+      userIdForLogging = 'auth-error'
+    }
+    
     console.error('[Trips API] POST error details:', {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       name: error instanceof Error ? error.name : undefined,
+      userId: userIdForLogging,
     })
+    
+    // Check for specific Clerk errors
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+      return NextResponse.json(
+        { error: 'Unauthorized - please sign in to create trips' },
+        { status: 401 }
+      )
+    }
+    
     return NextResponse.json(
       { 
         error: 'Failed to create trip',
-        details: error instanceof Error ? error.message : String(error),
+        details: errorMessage,
       },
       { status: 500 }
     )

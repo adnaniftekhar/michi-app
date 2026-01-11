@@ -263,6 +263,57 @@ describe('/api/trips', () => {
       expect(updateUserMetadata).toHaveBeenCalled()
     })
 
+    it('should preserve existing pathways and scheduleBlocks when creating trip', async () => {
+      const { auth, clerkClient } = await import('@clerk/nextjs/server')
+      vi.mocked(auth).mockResolvedValue({ userId: 'user-123' } as any)
+
+      const existingMetadata = {
+        pathways: {
+          'trip-existing': {
+            days: [{ day: 1, date: '2024-06-01', scheduleBlocks: [] }],
+          },
+        },
+        scheduleBlocks: {
+          'trip-existing': [],
+        },
+      }
+
+      const updateUserMetadata = vi.fn().mockResolvedValue(undefined)
+      const mockClient = {
+        users: {
+          getUser: vi.fn().mockResolvedValue({
+            privateMetadata: existingMetadata,
+          }),
+          updateUserMetadata,
+        },
+      }
+      vi.mocked(clerkClient).mockResolvedValue(mockClient as any)
+
+      const request = new Request('http://localhost/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'New Trip',
+          startDate: '2024-06-15',
+          endDate: '2024-06-20',
+          baseLocation: 'New York',
+        }),
+      })
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(201)
+      expect(data.trip.title).toBe('New Trip')
+      
+      // Verify that pathways and scheduleBlocks are preserved
+      const callArgs = updateUserMetadata.mock.calls[0]
+      const savedMetadata = callArgs[1].privateMetadata
+      expect(savedMetadata.pathways).toEqual(existingMetadata.pathways)
+      expect(savedMetadata.scheduleBlocks).toEqual(existingMetadata.scheduleBlocks)
+      expect(Array.isArray(savedMetadata.trips)).toBe(true)
+      expect(savedMetadata.trips.length).toBe(1)
+    })
+
     it('should handle Clerk API errors gracefully', async () => {
       const { auth, clerkClient } = await import('@clerk/nextjs/server')
       vi.mocked(auth).mockResolvedValue({ userId: 'user-123' } as any)

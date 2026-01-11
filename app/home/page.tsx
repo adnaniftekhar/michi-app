@@ -46,6 +46,7 @@ export default function Home() {
 
   const handleCreateTrip = async (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
     try {
+      console.log('[handleCreateTrip] Creating trip:', tripData)
       const response = await fetch('/api/trips', {
         method: 'POST',
         headers: {
@@ -59,19 +60,30 @@ export default function Home() {
         }),
       })
 
+      console.log('[handleCreateTrip] Response status:', response.status, response.statusText)
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create trip')
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        console.error('[handleCreateTrip] API error:', errorData)
+        throw new Error(errorData.error || errorData.details || 'Failed to create trip')
       }
 
       const data = await response.json()
+      console.log('[handleCreateTrip] ✅ Trip created:', data.trip)
       // Refresh trips list
       await fetchTrips()
       setShowForm(false)
       showToast('Trip created successfully', 'success')
     } catch (error) {
-      console.error('Failed to create trip:', error)
-      showToast(error instanceof Error ? error.message : 'Failed to create trip', 'error')
+      console.error('[handleCreateTrip] ❌ Failed to create trip:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create trip'
+      console.error('[handleCreateTrip] Error message:', errorMessage)
+      showToast(errorMessage, 'error')
     }
   }
 

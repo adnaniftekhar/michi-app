@@ -88,9 +88,10 @@ export async function PUT(request: Request) {
       [tripId]: pathway,
     }
 
-    // Save to Clerk user metadata
+    // Save to Clerk user metadata - MERGE with existing metadata to preserve trips, scheduleBlocks, etc.
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
+        ...(user.privateMetadata || {}),
         pathways: updatedPathways,
       },
     })

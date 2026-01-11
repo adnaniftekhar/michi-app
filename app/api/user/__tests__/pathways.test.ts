@@ -191,6 +191,66 @@ describe('/api/user/pathways', () => {
       })
     })
 
+    it('should preserve existing metadata (trips, scheduleBlocks) when saving pathway', async () => {
+      const { auth, clerkClient } = await import('@clerk/nextjs/server')
+      vi.mocked(auth).mockResolvedValue({ userId: 'user-123' } as any)
+
+      const mockPathway: FinalPathwayPlan = {
+        days: [
+          {
+            day: 1,
+            date: '2024-06-01',
+            drivingQuestion: 'Test question',
+            fieldExperience: 'Test experience',
+            inquiryTask: 'Test task',
+            artifact: 'Test artifact',
+            reflectionPrompt: 'Test reflection',
+            critiqueStep: 'Test critique',
+            scheduleBlocks: [],
+          },
+        ],
+      }
+
+      const existingMetadata = {
+        trips: [{ id: 'trip-1', trip: { id: 'trip-1', title: 'Existing Trip' } }],
+        scheduleBlocks: { 'trip-1': [] },
+      }
+
+      const updateUserMetadata = vi.fn().mockResolvedValue(undefined)
+      const mockClient = {
+        users: {
+          getUser: vi.fn().mockResolvedValue({
+            privateMetadata: existingMetadata,
+          }),
+          updateUserMetadata,
+        },
+      }
+      vi.mocked(clerkClient).mockResolvedValue(mockClient as any)
+
+      const request = new Request('http://localhost/api/user/pathways', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tripId: 'trip-123',
+          pathway: mockPathway,
+        }),
+      })
+      const response = await PUT(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.success).toBe(true)
+      // Verify that existing metadata is preserved
+      expect(updateUserMetadata).toHaveBeenCalledWith('user-123', {
+        privateMetadata: {
+          ...existingMetadata,
+          pathways: {
+            'trip-123': mockPathway,
+          },
+        },
+      })
+    })
+
     it('should merge with existing pathways', async () => {
       const { auth, clerkClient } = await import('@clerk/nextjs/server')
       vi.mocked(auth).mockResolvedValue({ userId: 'user-123' } as any)
@@ -227,15 +287,19 @@ describe('/api/user/pathways', () => {
         ],
       }
 
+      const existingMetadata = {
+        pathways: {
+          'trip-existing': existingPathway,
+        },
+        trips: [{ id: 'trip-1', trip: { id: 'trip-1', title: 'Existing Trip' } }],
+        scheduleBlocks: { 'trip-1': [] },
+      }
+
       const updateUserMetadata = vi.fn().mockResolvedValue(undefined)
       const mockClient = {
         users: {
           getUser: vi.fn().mockResolvedValue({
-            privateMetadata: {
-              pathways: {
-                'trip-existing': existingPathway,
-              },
-            },
+            privateMetadata: existingMetadata,
           }),
           updateUserMetadata,
         },
@@ -255,8 +319,10 @@ describe('/api/user/pathways', () => {
 
       expect(response.status).toBe(200)
       expect(data.success).toBe(true)
+      // Verify that existing metadata AND existing pathways are preserved
       expect(updateUserMetadata).toHaveBeenCalledWith('user-123', {
         privateMetadata: {
+          ...existingMetadata,
           pathways: {
             'trip-existing': existingPathway,
             'trip-new': newPathway,

@@ -46,18 +46,23 @@ export default function Home() {
 
   const handleCreateTrip = async (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
     try {
-      console.log('[handleCreateTrip] Creating trip:', tripData)
+      const requestBody = {
+        ...tripData,
+        learningTarget: tripData.learningTarget || {
+          track: '15min',
+        },
+      }
+      
+      console.log('[handleCreateTrip] Creating trip:', requestBody)
+      console.log('[handleCreateTrip] Request body stringified:', JSON.stringify(requestBody))
+      
       const response = await fetch('/api/trips', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          ...tripData,
-          learningTarget: tripData.learningTarget || {
-            track: '15min',
-          },
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       console.log('[handleCreateTrip] Response status:', response.status, response.statusText)

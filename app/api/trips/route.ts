@@ -42,11 +42,30 @@ export async function GET() {
 // POST /api/trips - Create a new trip
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-  console.log(`[Trips API] [${requestId}] ========== POST REQUEST START ==========`)
-  console.log(`[Trips API] [${requestId}] Request URL:`, request.url)
-  console.log(`[Trips API] [${requestId}] Request method:`, request.method)
   
+  // Wrap EVERYTHING in try-catch to catch Next.js runtime errors
   try {
+    console.log(`[Trips API] [${requestId}] ========== POST REQUEST START ==========`)
+    console.log(`[Trips API] [${requestId}] Request URL:`, request.url)
+    console.log(`[Trips API] [${requestId}] Request method:`, request.method)
+    console.log(`[Trips API] [${requestId}] Request headers:`, Object.fromEntries(request.headers.entries()))
+    
+    // Check if request body is readable BEFORE trying to parse
+    const contentType = request.headers.get('content-type')
+    console.log(`[Trips API] [${requestId}] Content-Type:`, contentType)
+    
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error(`[Trips API] [${requestId}] ❌ Invalid Content-Type:`, contentType)
+      return NextResponse.json(
+        { 
+          error: 'Invalid Content-Type', 
+          details: `Expected application/json, got ${contentType}`,
+          requestId 
+        },
+        { status: 400 }
+      )
+    }
+    
     // Step 1: Authenticate user
     console.log(`[Trips API] [${requestId}] Step 1: Authenticating user...`)
     let userId: string | null = null

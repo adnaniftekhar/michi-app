@@ -108,16 +108,54 @@ export async function POST(request: Request) {
 
     const responseText = result.response.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
     
-    // Parse JSON response
+    console.log('[Finalize API] AI response length:', responseText.length)
+    console.log('[Finalize API] AI response preview:', responseText.substring(0, 500))
+    
+    // Check for empty response
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('[Finalize API] Empty response from AI')
+      return NextResponse.json(
+        { error: 'Empty response from AI - please try again', details: 'No content generated' },
+        { status: 500 }
+      )
+    }
+    
+    // Parse JSON response - try multiple extraction methods
     let parsedResponse
     try {
-      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/```\s*([\s\S]*?)\s*```/)
-      const jsonText = jsonMatch ? jsonMatch[1] : responseText
+      // Method 1: Try to find JSON in code blocks
+      let jsonText = responseText
+      
+      const jsonBlockMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/)
+      if (jsonBlockMatch) {
+        jsonText = jsonBlockMatch[1]
+        console.log('[Finalize API] Found JSON in ```json block')
+      } else {
+        const codeBlockMatch = responseText.match(/```\s*([\s\S]*?)\s*```/)
+        if (codeBlockMatch) {
+          jsonText = codeBlockMatch[1]
+          console.log('[Finalize API] Found JSON in ``` block')
+        } else {
+          // Method 2: Try to find JSON object directly (starts with { and ends with })
+          const jsonObjectMatch = responseText.match(/\{[\s\S]*\}/)
+          if (jsonObjectMatch) {
+            jsonText = jsonObjectMatch[0]
+            console.log('[Finalize API] Found JSON object directly')
+          }
+        }
+      }
+      
       parsedResponse = JSON.parse(jsonText.trim())
+      console.log('[Finalize API] JSON parsed successfully, days:', parsedResponse.days?.length)
     } catch (parseError) {
-      console.error('Failed to parse finalize response:', parseError)
+      console.error('[Finalize API] Failed to parse response:', parseError)
+      console.error('[Finalize API] Full response was:', responseText)
       return NextResponse.json(
-        { error: 'Invalid JSON response from AI', details: String(parseError) },
+        { 
+          error: 'Invalid JSON response from AI', 
+          details: String(parseError),
+          responsePreview: responseText.substring(0, 1000)
+        },
         { status: 500 }
       )
     }

@@ -228,18 +228,12 @@ export default function TripDetailPage() {
     }
   }
 
-  const formatDateRange = (start: string, end: string) => {
-    const startDate = new Date(start).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    const endDate = new Date(end).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return `${startDate} - ${endDate}`
+  const calculateNumberOfDays = (start: string, end: string): number => {
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return diffDays
   }
 
   const updateScheduleBlocks = (newBlocks: ScheduleBlock[]) => {
@@ -303,7 +297,7 @@ export default function TripDetailPage() {
         <>
           <PageHeader
             title={trip.title}
-            subtitle={`${formatDateRange(trip.startDate, trip.endDate)} • ${trip.baseLocation} • ${timezoneLabel}`}
+            subtitle={`${calculateNumberOfDays(trip.startDate, trip.endDate)} days • ${trip.baseLocation} • ${timezoneLabel}`}
             action={
               <Button variant="secondary" onClick={() => setIsEditingTrip(true)}>
                 Edit Trip

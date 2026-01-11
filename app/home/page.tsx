@@ -87,18 +87,12 @@ export default function Home() {
     }
   }
 
-  const formatDateRange = (start: string, end: string) => {
-    const startDate = new Date(start).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    const endDate = new Date(end).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return `${startDate} - ${endDate}`
+  const calculateNumberOfDays = (start: string, end: string): number => {
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return diffDays
   }
 
   return (
@@ -167,19 +161,19 @@ export default function Home() {
                   fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-secondary)',
                   lineHeight: 'var(--line-height-normal)',
-                  marginBottom: 'var(--spacing-2)',
                 }}
               >
-                {formatDateRange(trip.startDate, trip.endDate)}
+                {trip.baseLocation}
               </p>
               <p
                 style={{
                   fontSize: 'var(--font-size-sm)',
                   color: 'var(--color-text-muted)',
                   lineHeight: 'var(--line-height-normal)',
+                  marginTop: 'var(--spacing-2)',
                 }}
               >
-                {trip.baseLocation}
+                {calculateNumberOfDays(trip.startDate, trip.endDate)} days
               </p>
             </Card>
           ))}

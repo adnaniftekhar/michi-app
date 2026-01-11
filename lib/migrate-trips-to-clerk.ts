@@ -5,7 +5,7 @@
 import { clerkClient } from '@clerk/nextjs/server'
 import { getTripsByUserId } from './trips-storage'
 import {
-  getTripsFromMetadata,
+  getTripRecordsFromMetadata,
   updateTripsData,
   tripsDataToMetadata,
 } from './trips-storage-clerk'
@@ -27,7 +27,7 @@ export async function migrateTripsToClerk(userId: string): Promise<number> {
     // Get existing trips from Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
-    const existingTrips = (user.privateMetadata?.trips?.trips || []) as any[]
+    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
 
     // Convert file trips to trip records
     const tripRecords = fileTrips.map((trip) => ({

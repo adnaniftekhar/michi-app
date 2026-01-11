@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import {
   getTripsFromMetadata,
+  getTripRecordsFromMetadata,
   createTripRecord,
   updateTripsData,
   tripsDataToMetadata,
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     // Get existing trips from Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
-    const existingTrips = (user.privateMetadata?.trips?.trips || []) as any[]
+    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
 
     // Create new trip record
     const tripRecord = createTripRecord({

@@ -25,6 +25,15 @@ export function getTripsFromMetadata(metadata: any): Trip[] {
 }
 
 /**
+ * Get trip records (with metadata) from Clerk user metadata
+ * Returns the full TripRecord[] array, not just Trip[]
+ */
+export function getTripRecordsFromMetadata(metadata: any): TripRecord[] {
+  const tripsData = (metadata?.trips || { trips: [] }) as TripsData
+  return tripsData.trips || []
+}
+
+/**
  * Get a single trip from metadata
  */
 export function getTripFromMetadata(metadata: any, tripId: string): Trip | null {

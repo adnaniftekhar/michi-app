@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import {
   getTripFromMetadata,
+  getTripRecordsFromMetadata,
   updateTripsData,
   removeTripFromData,
   tripsDataToMetadata,
@@ -69,7 +70,7 @@ export async function PATCH(
     // Get existing trips from Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
-    const existingTrips = (user.privateMetadata?.trips?.trips || []) as any[]
+    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
 
     // Find the trip to update
     const tripIndex = existingTrips.findIndex((t) => t.id === id)
@@ -135,7 +136,7 @@ export async function DELETE(
     // Get existing trips from Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
-    const existingTrips = (user.privateMetadata?.trips?.trips || []) as any[]
+    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
 
     // Check if trip exists
     const tripExists = existingTrips.some((t) => t.id === id)

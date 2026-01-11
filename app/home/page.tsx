@@ -1,15 +1,16 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type { Trip } from '@/types'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CreateTripForm } from '@/components/CreateTripForm'
 import { showToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { getTripImageUrl, getTripImageAlt } from '@/lib/trip-images'
+import Link from 'next/link'
 
 // localStorage key for trips
 const TRIPS_STORAGE_KEY = 'michi_user_trips'
@@ -157,6 +158,74 @@ export default function Home() {
     return diffDays
   }
 
+  // Drag and drop state
+  const [draggedTripId, setDraggedTripId] = useState<string | null>(null)
+  const [dragOverTripId, setDragOverTripId] = useState<string | null>(null)
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, tripId: string) => {
+    setDraggedTripId(tripId)
+    e.dataTransfer.effectAllowed = 'move'
+    // Add a slight delay to allow the drag ghost to render
+    setTimeout(() => {
+      const el = document.getElementById(`trip-${tripId}`)
+      if (el) el.style.opacity = '0.5'
+    }, 0)
+  }
+
+  const handleDragEnd = () => {
+    // Reset all opacity
+    trips.forEach(trip => {
+      const el = document.getElementById(`trip-${trip.id}`)
+      if (el) el.style.opacity = '1'
+    })
+    setDraggedTripId(null)
+    setDragOverTripId(null)
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent, tripId: string) => {
+    e.preventDefault()
+    if (tripId !== draggedTripId) {
+      setDragOverTripId(tripId)
+    }
+  }
+
+  const handleDragLeave = () => {
+    // Use timeout to prevent flickering
+    dragTimeoutRef.current = setTimeout(() => {
+      setDragOverTripId(null)
+    }, 50)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetTripId: string) => {
+    e.preventDefault()
+    if (!draggedTripId || draggedTripId === targetTripId) return
+
+    const draggedIndex = trips.findIndex(t => t.id === draggedTripId)
+    const targetIndex = trips.findIndex(t => t.id === targetTripId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    // Reorder trips
+    const newTrips = [...trips]
+    const [draggedTrip] = newTrips.splice(draggedIndex, 1)
+    newTrips.splice(targetIndex, 0, draggedTrip)
+
+    setTrips(newTrips)
+    
+    // Save new order to localStorage
+    if (user) {
+      saveTripsToStorage(user.id, newTrips)
+    }
+
+    setDraggedTripId(null)
+    setDragOverTripId(null)
+    showToast('Trip order updated', 'success')
+  }
+
   return (
     <>
       <PageHeader
@@ -199,47 +268,154 @@ export default function Home() {
           }
         />
       ) : (
-        <div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-          style={{
-            gap: 'var(--spacing-6)',
-          }}
-        >
-          {trips.map((trip) => (
-            <Card key={trip.id} href={`/trips/${trip.id}`}>
-              <h2
+        <>
+          <p
+            style={{
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--color-text-muted)',
+              marginBottom: 'var(--spacing-4)',
+              fontStyle: 'italic',
+            }}
+          >
+            💡 Drag trips to reorder them
+          </p>
+          <div 
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            style={{
+              gap: 'var(--spacing-6)',
+            }}
+          >
+            {trips.map((trip, index) => (
+              <Link
+                key={trip.id}
+                href={`/trips/${trip.id}`}
+                id={`trip-${trip.id}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, trip.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, trip.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, trip.id)}
                 style={{
-                  fontSize: 'var(--font-size-lg)',
-                  lineHeight: 'var(--line-height-tight)',
-                  fontWeight: 'var(--font-weight-semibold)',
-                  color: 'var(--color-text-primary)',
-                  marginBottom: 'var(--spacing-3)',
+                  display: 'block',
+                  textDecoration: 'none',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden',
+                  backgroundColor: 'var(--color-surface)',
+                  border: dragOverTripId === trip.id 
+                    ? '2px solid var(--color-primary)' 
+                    : '1px solid var(--color-border)',
+                  boxShadow: dragOverTripId === trip.id 
+                    ? '0 4px 12px rgba(0,0,0,0.15)' 
+                    : 'var(--shadow-sm)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'grab',
+                  transform: dragOverTripId === trip.id ? 'scale(1.02)' : 'scale(1)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!draggedTripId) {
+                    e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!draggedTripId && dragOverTripId !== trip.id) {
+                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
                 }}
               >
-                {trip.title}
-              </h2>
-              <p
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-secondary)',
-                  lineHeight: 'var(--line-height-normal)',
-                }}
-              >
-                {trip.baseLocation}
-              </p>
-              <p
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-text-muted)',
-                  lineHeight: 'var(--line-height-normal)',
-                  marginTop: 'var(--spacing-2)',
-                }}
-              >
-                {calculateNumberOfDays(trip.startDate, trip.endDate)} days
-              </p>
-            </Card>
-          ))}
-        </div>
+                {/* Trip Image */}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '160px',
+                    backgroundImage: `url(${getTripImageUrl(trip.baseLocation, index)})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Gradient overlay for better text readability */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: '60%',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                    }}
+                  />
+                  {/* Days badge */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'var(--spacing-3)',
+                      right: 'var(--spacing-3)',
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      padding: 'var(--spacing-1) var(--spacing-3)',
+                      borderRadius: 'var(--radius-full)',
+                      fontSize: 'var(--font-size-xs)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      backdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    {calculateNumberOfDays(trip.startDate, trip.endDate)} days
+                  </div>
+                  {/* Drag handle indicator */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'var(--spacing-3)',
+                      left: 'var(--spacing-3)',
+                      backgroundColor: 'rgba(0,0,0,0.4)',
+                      color: 'white',
+                      padding: 'var(--spacing-1)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: 'var(--font-size-xs)',
+                      backdropFilter: 'blur(4px)',
+                      display: 'flex',
+                      gap: '2px',
+                    }}
+                    title="Drag to reorder"
+                  >
+                    <span style={{ opacity: 0.8 }}>⋮⋮</span>
+                  </div>
+                </div>
+                
+                {/* Trip Info */}
+                <div style={{ padding: 'var(--spacing-4)' }}>
+                  <h2
+                    style={{
+                      fontSize: 'var(--font-size-lg)',
+                      lineHeight: 'var(--line-height-tight)',
+                      fontWeight: 'var(--font-weight-semibold)',
+                      color: 'var(--color-text-primary)',
+                      marginBottom: 'var(--spacing-2)',
+                    }}
+                  >
+                    {trip.title}
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
+                      lineHeight: 'var(--line-height-normal)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--spacing-1)',
+                    }}
+                  >
+                    <span style={{ opacity: 0.7 }}>📍</span>
+                    {trip.baseLocation}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </>
   )

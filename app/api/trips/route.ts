@@ -165,30 +165,79 @@ export async function POST(request: Request) {
     // Step 8: Save to Clerk
     currentStep = 'save-metadata'
     console.log(`[Trips API] [${requestId}] Step 8: Saving to Clerk metadata...`)
-    const newMetadata = {
-      ...(user.privateMetadata || {}),
-      ...tripsDataToMetadata(updatedTrips),
+    
+    // CRITICAL: Sanitize metadata by round-tripping through JSON
+    // This removes any non-serializable values (functions, undefined, circular refs)
+    let existingMetadata: Record<string, any> = {}
+    try {
+      // Safely copy existing metadata - only include serializable values
+      if (user.privateMetadata && typeof user.privateMetadata === 'object') {
+        existingMetadata = JSON.parse(JSON.stringify(user.privateMetadata))
+      }
+    } catch (metadataError) {
+      console.warn(`[Trips API] [${requestId}] Existing metadata not serializable, starting fresh:`, metadataError)
+      existingMetadata = {}
     }
-    const metadataSize = JSON.stringify(newMetadata).length
-    console.log(`[Trips API] [${requestId}] Step 8: Metadata size=${metadataSize} bytes`)
+    
+    // Only keep known safe fields from existing metadata
+    const safeMetadata: Record<string, any> = {}
+    if (existingMetadata.pathways) safeMetadata.pathways = existingMetadata.pathways
+    if (existingMetadata.scheduleBlocks) safeMetadata.scheduleBlocks = existingMetadata.scheduleBlocks
+    if (existingMetadata.profile) safeMetadata.profile = existingMetadata.profile
+    
+    // Add the new trips data
+    safeMetadata.trips = updatedTrips
+    
+    // Final sanitization - ensure it's valid JSON
+    let finalMetadata: Record<string, any>
+    try {
+      finalMetadata = JSON.parse(JSON.stringify(safeMetadata))
+    } catch (sanitizeError) {
+      console.error(`[Trips API] [${requestId}] Failed to sanitize metadata:`, sanitizeError)
+      return NextResponse.json(
+        { error: 'Failed to prepare metadata', details: sanitizeError instanceof Error ? sanitizeError.message : String(sanitizeError), requestId, step: currentStep },
+        { status: 500 }
+      )
+    }
+    
+    const metadataSize = JSON.stringify(finalMetadata).length
+    console.log(`[Trips API] [${requestId}] Step 8: Metadata size=${metadataSize} bytes, keys=${Object.keys(finalMetadata).join(',')}`)
     
     try {
       await client.users.updateUserMetadata(userId, {
-        privateMetadata: newMetadata,
+        privateMetadata: finalMetadata,
       })
       console.log(`[Trips API] [${requestId}] Step 8: Metadata saved OK!`)
-    } catch (saveError) {
+    } catch (saveError: any) {
       console.error(`[Trips API] [${requestId}] Step 8 FAILED: Save metadata error:`, saveError)
-      // Log more details about the error
-      if (saveError && typeof saveError === 'object') {
-        console.error(`[Trips API] [${requestId}] Error type:`, (saveError as any).constructor?.name)
-        console.error(`[Trips API] [${requestId}] Error status:`, (saveError as any).status)
-        console.error(`[Trips API] [${requestId}] Error errors:`, (saveError as any).errors)
+      // Log EVERYTHING about the Clerk error
+      console.error(`[Trips API] [${requestId}] Error type:`, saveError?.constructor?.name)
+      console.error(`[Trips API] [${requestId}] Error message:`, saveError?.message)
+      console.error(`[Trips API] [${requestId}] Error status:`, saveError?.status)
+      console.error(`[Trips API] [${requestId}] Error statusCode:`, saveError?.statusCode)
+      console.error(`[Trips API] [${requestId}] Error code:`, saveError?.code)
+      console.error(`[Trips API] [${requestId}] Error errors:`, JSON.stringify(saveError?.errors, null, 2))
+      console.error(`[Trips API] [${requestId}] Error clerkError:`, saveError?.clerkError)
+      console.error(`[Trips API] [${requestId}] Error clerkTraceId:`, saveError?.clerkTraceId)
+      
+      // Try to get the full error as JSON
+      try {
+        console.error(`[Trips API] [${requestId}] Full error JSON:`, JSON.stringify(saveError, Object.getOwnPropertyNames(saveError), 2))
+      } catch {
+        console.error(`[Trips API] [${requestId}] Could not stringify full error`)
       }
+      
+      // Extract Clerk-specific error details
+      const clerkErrors = saveError?.errors || []
+      const errorDetails = clerkErrors.length > 0 
+        ? clerkErrors.map((e: any) => `${e.code}: ${e.message}`).join('; ')
+        : (saveError?.message || String(saveError))
+      
       return NextResponse.json(
         { 
           error: 'Failed to save trip to Clerk', 
-          details: saveError instanceof Error ? saveError.message : String(saveError), 
+          details: errorDetails,
+          clerkTraceId: saveError?.clerkTraceId,
           requestId, 
           step: currentStep,
           metadataSize 

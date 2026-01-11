@@ -107,8 +107,21 @@ export async function POST(request: Request) {
     
     let body: any
     try {
-      // Use request.json() directly - it handles the body stream correctly
-      body = await request.json()
+      // CRITICAL FIX: Read body as text first, then parse JSON manually
+      // This bypasses Next.js runtime parsing that causes "Unprocessable Entity" errors
+      const bodyText = await request.text()
+      console.log(`[Trips API] [${requestId}] Body text received (length: ${bodyText.length}):`, bodyText.substring(0, 200))
+      
+      if (!bodyText || bodyText.trim().length === 0) {
+        console.error(`[Trips API] [${requestId}] ❌ Empty request body`)
+        return NextResponse.json(
+          { error: 'Request body is empty', requestId },
+          { status: 400 }
+        )
+      }
+      
+      // Parse JSON manually to avoid Next.js runtime issues
+      body = JSON.parse(bodyText)
       console.log(`[Trips API] [${requestId}] ✅ Request body parsed successfully:`, {
         hasTitle: !!body.title,
         hasStartDate: !!body.startDate,

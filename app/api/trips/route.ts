@@ -428,67 +428,18 @@ export async function POST(request: Request) {
     console.log(`[Trips API] [${requestId}] ✅ SUCCESS: Trip created and saved`)
     return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorName = error instanceof Error ? error.name : 'UnknownError'
-    const errorStack = error instanceof Error ? error.stack : undefined
-    
-    console.error(`[Trips API] [${requestId}] ❌❌❌ TOP-LEVEL ERROR:`, {
-      message: errorMessage,
-      name: errorName,
-      stack: errorStack,
-      fullError: String(error),
-      errorType: typeof error,
-      errorConstructor: error?.constructor?.name,
+    console.error('[Trips API] POST error:', error)
+    console.error('[Trips API] POST error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
     })
-    
-    // Try to get userId for logging (might fail if auth error)
-    let userIdForLogging = 'unknown'
-    try {
-      const authResult = await auth()
-      userIdForLogging = authResult.userId || 'no-user-id'
-    } catch {
-      userIdForLogging = 'auth-error'
-    }
-    
-    console.error(`[Trips API] [${requestId}] Final error details:`, {
-      requestId,
-      message: errorMessage,
-      stack: errorStack,
-      name: errorName,
-      userId: userIdForLogging,
-    })
-    
-    // Check for specific Clerk errors
-    if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
     return NextResponse.json(
-        { error: 'Unauthorized - please sign in to create trips', details: errorMessage, requestId },
-        { status: 401 }
-      )
-    }
-    
-    // ALWAYS expose detailed error information for debugging
-    // This helps identify production issues quickly
-    const errorResponse: any = {
-      error: 'Failed to create trip',
-      details: errorMessage,
-      requestId, // Include request ID for debugging
-      errorName: errorName,
-      // Include stack trace in production for debugging (sanitized)
-      stack: errorStack ? errorStack.split('\n').slice(0, 5).join('\n') : undefined, // First 5 lines only
-    }
-    
-    // Log full details server-side (these will appear in Vercel/Cloud Run logs)
-    console.error(`[Trips API] [${requestId}] ❌❌❌ PRODUCTION ERROR - Full details:`, {
-      requestId,
-      message: errorMessage,
-      name: errorName,
-      stack: errorStack,
-      userId: userIdForLogging,
-      environment: process.env.NODE_ENV,
-      isVercel: !!process.env.VERCEL,
-      timestamp: new Date().toISOString(),
-    })
-    
-    return NextResponse.json(errorResponse, { status: 500 })
+      { 
+        error: 'Failed to create trip',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    )
   }
 }

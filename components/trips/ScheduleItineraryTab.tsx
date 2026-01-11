@@ -766,6 +766,65 @@ export function ScheduleItineraryTab({
     
     onScheduleUpdate(updated)
 
+    // Save pathway to API if user is authenticated (Clerk user ID starts with 'user_')
+    // Convert AIPlanResponse to FinalPathwayPlan format for saving
+    if (currentUserId.startsWith('user_')) {
+      try {
+        // Convert draft to FinalPathwayPlan format
+        const finalPlan: FinalPathwayPlan = {
+          days: draft.days.map((day, index) => {
+            // Calculate the actual date for this day
+            const dayDate = new Date(startDate)
+            dayDate.setDate(startDate.getDate() + (day.day - 1))
+            const actualDate = (day as any)._mappedDate || dayDate.toISOString().split('T')[0]
+            
+            return {
+              day: day.day,
+              date: actualDate,
+              drivingQuestion: day.drivingQuestion,
+              fieldExperience: day.fieldExperience,
+              inquiryTask: day.inquiryTask,
+              artifact: day.artifact,
+              reflectionPrompt: day.reflectionPrompt,
+              critiqueStep: day.critiqueStep,
+              scheduleBlocks: day.scheduleBlocks.map((block) => {
+                // Map the block to include localOptions if available
+                const enrichedBlock = block as any
+                return {
+                  startTime: block.startTime,
+                  duration: block.duration,
+                  title: block.title,
+                  description: block.description,
+                  localOptions: enrichedBlock.localOptions,
+                }
+              }),
+            }
+          }),
+          summary: (draft as any).summary,
+        }
+
+        const response = await fetch('/api/user/pathways', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.id,
+            pathway: finalPlan,
+          }),
+        })
+        
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('[handleApplyAIPathway] Failed to save pathway to API:', error)
+          // Don't block the UI if saving fails
+        } else {
+          console.log('[handleApplyAIPathway] ✅ Pathway saved to API for trip:', trip.id)
+        }
+      } catch (error) {
+        console.error('[handleApplyAIPathway] Error saving pathway to API:', error)
+        // Don't block the UI if saving fails
+      }
+    }
+
     setShowAIModal(false)
     showToast(`AI pathway applied: ${newBlocks.length} activities added`, 'success')
   }

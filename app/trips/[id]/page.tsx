@@ -26,6 +26,7 @@ import { LogsTab } from '@/components/trips/LogsTab'
 import { TargetsTab } from '@/components/trips/TargetsTab'
 import { CreateTripForm } from '@/components/CreateTripForm'
 import { TripHeader } from '@/components/trips/TripHeader'
+import { pathwayPlanToScheduleBlocks } from '@/lib/pathway-utils'
 
 export default function TripDetailPage() {
   const params = useParams()
@@ -60,12 +61,48 @@ export default function TripDetailPage() {
           throw new Error('Failed to fetch trip')
         }
         const data = await response.json()
-        setTrip(data.trip)
+        const fetchedTrip = data.trip
+        setTrip(fetchedTrip)
 
-        // Schedule blocks and activity logs are still stored in localStorage
-        // TODO: Move these to API routes as well
-        const localData = getData('current') // Use a placeholder key for now
-        setScheduleBlocks(localData.scheduleBlocks[tripId] || [])
+        // Try to load saved pathway from API first (for cross-device sync)
+        let apiBlocks: ScheduleBlock[] = []
+        try {
+          const pathwayResponse = await fetch(`/api/user/pathways?tripId=${tripId}`)
+          if (pathwayResponse.ok) {
+            const pathwayData = await pathwayResponse.json()
+            if (pathwayData.pathway) {
+              console.log('[TripDetailPage] ✅ Loaded saved pathway from API')
+              apiBlocks = pathwayPlanToScheduleBlocks(
+                pathwayData.pathway,
+                tripId,
+                fetchedTrip.baseLocation
+              )
+            }
+          }
+        } catch (error) {
+          console.warn('[TripDetailPage] Failed to load pathway from API (non-critical):', error)
+          // Continue with localStorage fallback
+        }
+
+        // Load from localStorage as fallback or merge with API blocks
+        const localData = getData('current')
+        const localBlocks = localData.scheduleBlocks[tripId] || []
+        
+        // Prioritize API blocks if they exist, otherwise use localStorage
+        // If both exist, merge them (API blocks take precedence for generated blocks)
+        if (apiBlocks.length > 0) {
+          // Merge: keep manual blocks from localStorage, replace generated blocks with API blocks
+          const manualBlocks = localBlocks.filter(b => !b.isGenerated)
+          const mergedBlocks = [...manualBlocks, ...apiBlocks]
+          setScheduleBlocks(mergedBlocks)
+          // Also update localStorage to keep in sync
+          localData.scheduleBlocks[tripId] = mergedBlocks
+          setData('current', localData)
+        } else {
+          // No API pathway, use localStorage
+          setScheduleBlocks(localBlocks)
+        }
+        
         setActivityLogs(localData.activityLogs[tripId] || [])
       } catch (error) {
         console.error('Failed to fetch trip:', error)

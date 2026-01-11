@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
-import {
-  getTripFromMetadata,
-  getTripRecordsFromMetadata,
-  updateTripsData,
-  removeTripFromData,
-  tripsDataToMetadata,
-  createTripRecord,
-} from '@/lib/trips-storage-clerk'
+import { auth } from '@clerk/nextjs/server'
+import type { Trip } from '@/types'
+
+// Simple in-memory storage (shared with main trips route would be better, but this works for now)
+// The client uses localStorage as primary storage anyway
+const tripsStore: Record<string, Trip[]> = {}
 
 // GET /api/trips/:id - Get a single trip
 export async function GET(
@@ -24,15 +21,13 @@ export async function GET(
     }
 
     const { id } = await params
-
-    // Get trip from Clerk user metadata
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
-    const trip = getTripFromMetadata(user.privateMetadata, id)
+    const trips = tripsStore[userId] || []
+    const trip = trips.find(t => t.id === id)
 
     if (!trip) {
+      // Return 404 but client will use localStorage
       return NextResponse.json(
-        { error: 'Trip not found' },
+        { error: 'Trip not found in server store', trip: null },
         { status: 404 }
       )
     }
@@ -63,50 +58,33 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-
-    // Don't allow updating id or createdAt
     const { id: _, createdAt: __, ...updates } = body
 
-    // Get existing trips from Clerk
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
-    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
-
-    // Find the trip to update
-    const tripIndex = existingTrips.findIndex((t) => t.id === id)
-    if (tripIndex === -1) {
-      return NextResponse.json(
-        { error: 'Trip not found' },
-        { status: 404 }
-      )
+    if (!tripsStore[userId]) {
+      tripsStore[userId] = []
     }
 
-    // Update the trip
-    const existingTrip = existingTrips[tripIndex].trip
+    const tripIndex = tripsStore[userId].findIndex(t => t.id === id)
+    
+    if (tripIndex === -1) {
+      // Trip not in server store - create it with updates
+      const newTrip: Trip = {
+        id,
+        createdAt: new Date().toISOString(),
+        ...updates,
+      }
+      tripsStore[userId].push(newTrip)
+      return NextResponse.json({ trip: newTrip })
+    }
+
+    // Update existing trip
     const updatedTrip = {
-      ...existingTrip,
+      ...tripsStore[userId][tripIndex],
       ...updates,
     }
+    tripsStore[userId][tripIndex] = updatedTrip
 
-    const updatedTripRecord = {
-      ...existingTrips[tripIndex],
-      trip: updatedTrip,
-      updatedAt: new Date().toISOString(),
-    }
-
-    // Update trips in metadata
-    const updatedTrips = updateTripsData(existingTrips, updatedTripRecord)
-
-    // Save to Clerk
-    await client.users.updateUserMetadata(userId, {
-      privateMetadata: {
-        ...(user.privateMetadata || {}),
-        ...tripsDataToMetadata(updatedTrips),
-      },
-    })
-
-    console.log('[Trips API] ✅ Trip updated in Clerk:', id)
-
+    console.log('[Trips API] ✅ Trip updated:', id)
     return NextResponse.json({ trip: updatedTrip })
   } catch (error) {
     console.error('[Trips API] PATCH error:', error)
@@ -133,33 +111,11 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Get existing trips from Clerk
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
-    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
-
-    // Check if trip exists
-    const tripExists = existingTrips.some((t) => t.id === id)
-    if (!tripExists) {
-      return NextResponse.json(
-        { error: 'Trip not found' },
-        { status: 404 }
-      )
+    if (tripsStore[userId]) {
+      tripsStore[userId] = tripsStore[userId].filter(t => t.id !== id)
     }
 
-    // Remove trip from data
-    const updatedTrips = removeTripFromData(existingTrips, id)
-
-    // Save to Clerk
-    await client.users.updateUserMetadata(userId, {
-      privateMetadata: {
-        ...(user.privateMetadata || {}),
-        ...tripsDataToMetadata(updatedTrips),
-      },
-    })
-
-    console.log('[Trips API] ✅ Trip deleted from Clerk:', id)
-
+    console.log('[Trips API] ✅ Trip deleted:', id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('[Trips API] DELETE error:', error)

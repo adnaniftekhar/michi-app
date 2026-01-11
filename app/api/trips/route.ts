@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
-import { auth, clerkClient } from '@clerk/nextjs/server'
-import {
-  getTripsFromMetadata,
-  getTripRecordsFromMetadata,
-  createTripRecord,
-  updateTripsData,
-  tripsDataToMetadata,
-} from '@/lib/trips-storage-clerk'
+import { auth } from '@clerk/nextjs/server'
 import type { Trip } from '@/types'
+
+// Simple in-memory storage for trips (per-user)
+// Note: This resets on server restart, but localStorage on client will persist
+const tripsStore: Record<string, Trip[]> = {}
 
 // GET /api/trips - Get all trips for the current user
 export async function GET() {
@@ -20,11 +17,8 @@ export async function GET() {
       )
     }
 
-    // Get trips from Clerk user metadata
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
-    const trips = getTripsFromMetadata(user.privateMetadata)
-
+    // Return trips from in-memory store (may be empty, client uses localStorage as primary)
+    const trips = tripsStore[userId] || []
     return NextResponse.json({ trips })
   } catch (error) {
     console.error('[Trips API] GET error:', error)
@@ -37,234 +31,65 @@ export async function GET() {
 
 // POST /api/trips - Create a new trip
 export async function POST(request: Request) {
-  // Generate unique request ID for tracing
-  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(7)}`
-  let currentStep = 'init'
-  
   try {
-    // Step 1: Auth
-    currentStep = 'auth'
-    console.log(`[Trips API] [${requestId}] Step 1: Checking auth...`)
     const { userId } = await auth()
     if (!userId) {
-      console.log(`[Trips API] [${requestId}] Step 1: No userId - unauthorized`)
       return NextResponse.json(
-        { error: 'Unauthorized', requestId },
+        { error: 'Unauthorized' },
         { status: 401 }
       )
     }
-    console.log(`[Trips API] [${requestId}] Step 1: Auth OK, userId=${userId.substring(0, 10)}...`)
 
-    // Step 2: Read body as text
-    currentStep = 'read-body'
-    console.log(`[Trips API] [${requestId}] Step 2: Reading request body...`)
-    let bodyText: string
-    try {
-      bodyText = await request.text()
-      console.log(`[Trips API] [${requestId}] Step 2: Body read OK, length=${bodyText.length}`)
-    } catch (readError) {
-      console.error(`[Trips API] [${requestId}] Step 2 FAILED: Read error:`, readError)
-      return NextResponse.json(
-        { error: 'Failed to read request body', details: readError instanceof Error ? readError.message : String(readError), requestId, step: currentStep },
-        { status: 400 }
-      )
-    }
-
-    if (!bodyText || bodyText.trim() === '') {
-      console.error(`[Trips API] [${requestId}] Step 2 FAILED: Body is empty`)
-      return NextResponse.json(
-        { error: 'Request body is empty', requestId, step: currentStep },
-        { status: 400 }
-      )
-    }
-
-    // Step 3: Parse JSON
-    currentStep = 'parse-json'
-    console.log(`[Trips API] [${requestId}] Step 3: Parsing JSON...`)
+    // Parse request body
     let body: any
     try {
+      const bodyText = await request.text()
+      if (!bodyText) {
+        return NextResponse.json(
+          { error: 'Request body is empty' },
+          { status: 400 }
+        )
+      }
       body = JSON.parse(bodyText)
-      console.log(`[Trips API] [${requestId}] Step 3: JSON parsed OK, keys=${Object.keys(body).join(',')}`)
     } catch (parseError) {
-      console.error(`[Trips API] [${requestId}] Step 3 FAILED: Parse error:`, parseError)
-      console.error(`[Trips API] [${requestId}] Body text was:`, bodyText.substring(0, 200))
       return NextResponse.json(
-        { error: 'Invalid JSON in request body', details: parseError instanceof Error ? parseError.message : String(parseError), requestId, step: currentStep },
+        { error: 'Invalid JSON in request body' },
         { status: 400 }
       )
     }
 
-    // Step 4: Validate fields
-    currentStep = 'validate-fields'
-    console.log(`[Trips API] [${requestId}] Step 4: Validating fields...`)
     const { title, startDate, endDate, baseLocation, learningTarget } = body
 
     if (!title || !startDate || !endDate || !baseLocation) {
-      const missing = [
-        !title && 'title',
-        !startDate && 'startDate', 
-        !endDate && 'endDate',
-        !baseLocation && 'baseLocation'
-      ].filter(Boolean)
-      console.error(`[Trips API] [${requestId}] Step 4 FAILED: Missing fields: ${missing.join(', ')}`)
       return NextResponse.json(
-        { error: `Missing required fields: ${missing.join(', ')}`, requestId, step: currentStep },
+        { error: 'Missing required fields: title, startDate, endDate, baseLocation' },
         { status: 400 }
       )
     }
-    console.log(`[Trips API] [${requestId}] Step 4: Fields valid - title="${title}", location="${baseLocation}"`)
 
-    // Step 5: Get Clerk client
-    currentStep = 'clerk-client'
-    console.log(`[Trips API] [${requestId}] Step 5: Getting Clerk client...`)
-    let client
-    try {
-      client = await clerkClient()
-      console.log(`[Trips API] [${requestId}] Step 5: Clerk client OK`)
-    } catch (clerkError) {
-      console.error(`[Trips API] [${requestId}] Step 5 FAILED: Clerk client error:`, clerkError)
-      return NextResponse.json(
-        { error: 'Failed to initialize Clerk', details: clerkError instanceof Error ? clerkError.message : String(clerkError), requestId, step: currentStep },
-        { status: 500 }
-      )
-    }
-
-    // Step 6: Get user from Clerk
-    currentStep = 'get-user'
-    console.log(`[Trips API] [${requestId}] Step 6: Getting user from Clerk...`)
-    let user
-    try {
-      user = await client.users.getUser(userId)
-      console.log(`[Trips API] [${requestId}] Step 6: User fetched OK, has metadata=${!!user.privateMetadata}`)
-    } catch (getUserError) {
-      console.error(`[Trips API] [${requestId}] Step 6 FAILED: Get user error:`, getUserError)
-      return NextResponse.json(
-        { error: 'Failed to get user', details: getUserError instanceof Error ? getUserError.message : String(getUserError), requestId, step: currentStep },
-        { status: 500 }
-      )
-    }
-
-    // Step 7: Process trip data
-    currentStep = 'process-trip'
-    console.log(`[Trips API] [${requestId}] Step 7: Processing trip data...`)
-    const existingTrips = getTripRecordsFromMetadata(user.privateMetadata)
-    console.log(`[Trips API] [${requestId}] Step 7: Existing trips count=${existingTrips.length}`)
-
-    const tripRecord = createTripRecord({
+    // Create new trip
+    const newTrip: Trip = {
+      id: `trip-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       title,
       startDate,
       endDate,
       baseLocation,
       learningTarget,
-    })
-    console.log(`[Trips API] [${requestId}] Step 7: New trip created, id=${tripRecord.id}`)
-
-    const updatedTrips = updateTripsData(existingTrips, tripRecord)
-    console.log(`[Trips API] [${requestId}] Step 7: Updated trips count=${updatedTrips.length}`)
-
-    // Step 8: Save to Clerk
-    currentStep = 'save-metadata'
-    console.log(`[Trips API] [${requestId}] Step 8: Saving to Clerk metadata...`)
-    
-    // CRITICAL: Sanitize metadata by round-tripping through JSON
-    // This removes any non-serializable values (functions, undefined, circular refs)
-    let existingMetadata: Record<string, any> = {}
-    try {
-      // Safely copy existing metadata - only include serializable values
-      if (user.privateMetadata && typeof user.privateMetadata === 'object') {
-        existingMetadata = JSON.parse(JSON.stringify(user.privateMetadata))
-      }
-    } catch (metadataError) {
-      console.warn(`[Trips API] [${requestId}] Existing metadata not serializable, starting fresh:`, metadataError)
-      existingMetadata = {}
-    }
-    
-    // Only keep known safe fields from existing metadata
-    const safeMetadata: Record<string, any> = {}
-    if (existingMetadata.pathways) safeMetadata.pathways = existingMetadata.pathways
-    if (existingMetadata.scheduleBlocks) safeMetadata.scheduleBlocks = existingMetadata.scheduleBlocks
-    if (existingMetadata.profile) safeMetadata.profile = existingMetadata.profile
-    
-    // Add the new trips data
-    safeMetadata.trips = updatedTrips
-    
-    // Final sanitization - ensure it's valid JSON
-    let finalMetadata: Record<string, any>
-    try {
-      finalMetadata = JSON.parse(JSON.stringify(safeMetadata))
-    } catch (sanitizeError) {
-      console.error(`[Trips API] [${requestId}] Failed to sanitize metadata:`, sanitizeError)
-      return NextResponse.json(
-        { error: 'Failed to prepare metadata', details: sanitizeError instanceof Error ? sanitizeError.message : String(sanitizeError), requestId, step: currentStep },
-        { status: 500 }
-      )
-    }
-    
-    const metadataSize = JSON.stringify(finalMetadata).length
-    console.log(`[Trips API] [${requestId}] Step 8: Metadata size=${metadataSize} bytes, keys=${Object.keys(finalMetadata).join(',')}`)
-    
-    try {
-      await client.users.updateUserMetadata(userId, {
-        privateMetadata: finalMetadata,
-      })
-      console.log(`[Trips API] [${requestId}] Step 8: Metadata saved OK!`)
-    } catch (saveError: any) {
-      console.error(`[Trips API] [${requestId}] Step 8 FAILED: Save metadata error:`, saveError)
-      // Log EVERYTHING about the Clerk error
-      console.error(`[Trips API] [${requestId}] Error type:`, saveError?.constructor?.name)
-      console.error(`[Trips API] [${requestId}] Error message:`, saveError?.message)
-      console.error(`[Trips API] [${requestId}] Error status:`, saveError?.status)
-      console.error(`[Trips API] [${requestId}] Error statusCode:`, saveError?.statusCode)
-      console.error(`[Trips API] [${requestId}] Error code:`, saveError?.code)
-      console.error(`[Trips API] [${requestId}] Error errors:`, JSON.stringify(saveError?.errors, null, 2))
-      console.error(`[Trips API] [${requestId}] Error clerkError:`, saveError?.clerkError)
-      console.error(`[Trips API] [${requestId}] Error clerkTraceId:`, saveError?.clerkTraceId)
-      
-      // Try to get the full error as JSON
-      try {
-        console.error(`[Trips API] [${requestId}] Full error JSON:`, JSON.stringify(saveError, Object.getOwnPropertyNames(saveError), 2))
-      } catch {
-        console.error(`[Trips API] [${requestId}] Could not stringify full error`)
-      }
-      
-      // Extract Clerk-specific error details
-      const clerkErrors = saveError?.errors || []
-      const errorDetails = clerkErrors.length > 0 
-        ? clerkErrors.map((e: any) => `${e.code}: ${e.message}`).join('; ')
-        : (saveError?.message || String(saveError))
-      
-      return NextResponse.json(
-        { 
-          error: 'Failed to save trip to Clerk', 
-          details: errorDetails,
-          clerkTraceId: saveError?.clerkTraceId,
-          requestId, 
-          step: currentStep,
-          metadataSize 
-        },
-        { status: 500 }
-      )
+      createdAt: new Date().toISOString(),
     }
 
-    console.log(`[Trips API] [${requestId}] ✅ SUCCESS! Trip created: ${tripRecord.id}`)
-    return NextResponse.json({ trip: tripRecord.trip, requestId }, { status: 201 })
+    // Store in memory (client will also store in localStorage)
+    if (!tripsStore[userId]) {
+      tripsStore[userId] = []
+    }
+    tripsStore[userId].push(newTrip)
 
+    console.log('[Trips API] ✅ Trip created:', newTrip.id)
+    return NextResponse.json({ trip: newTrip }, { status: 201 })
   } catch (error) {
-    // Unexpected error - log everything
-    console.error(`[Trips API] [${requestId}] ❌ UNEXPECTED ERROR at step "${currentStep}":`, error)
-    if (error && typeof error === 'object') {
-      console.error(`[Trips API] [${requestId}] Error type:`, (error as any).constructor?.name)
-      console.error(`[Trips API] [${requestId}] Error status:`, (error as any).status)
-      console.error(`[Trips API] [${requestId}] Error code:`, (error as any).code)
-      console.error(`[Trips API] [${requestId}] Error errors:`, (error as any).errors)
-    }
+    console.error('[Trips API] POST error:', error)
     return NextResponse.json(
-      { 
-        error: 'Failed to create trip',
-        details: error instanceof Error ? error.message : String(error),
-        requestId,
-        step: currentStep,
-      },
+      { error: 'Failed to create trip' },
       { status: 500 }
     )
   }

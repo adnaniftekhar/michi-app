@@ -11,38 +11,54 @@ import { CreateTripForm } from '@/components/CreateTripForm'
 import { showToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
+// localStorage key for trips
+const TRIPS_STORAGE_KEY = 'michi_user_trips'
+
+// Helper to get trips from localStorage
+function getStoredTrips(userId: string): Trip[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const stored = localStorage.getItem(`${TRIPS_STORAGE_KEY}_${userId}`)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (e) {
+    console.error('Error reading trips from localStorage:', e)
+  }
+  return []
+}
+
+// Helper to save trips to localStorage
+function saveTripsToStorage(userId: string, trips: Trip[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(`${TRIPS_STORAGE_KEY}_${userId}`, JSON.stringify(trips))
+  } catch (e) {
+    console.error('Error saving trips to localStorage:', e)
+  }
+}
+
 export default function Home() {
-  const { isSignedIn, isLoaded } = useUser()
+  const { isSignedIn, isLoaded, user } = useUser()
   const [trips, setTrips] = useState<Trip[]>([])
   const [showForm, setShowForm] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Fetch trips from API
-  const fetchTrips = async () => {
-    if (!isLoaded || !isSignedIn) {
+  // Load trips from localStorage (primary storage now)
+  const loadTrips = () => {
+    if (!isLoaded || !isSignedIn || !user) {
       setIsLoading(false)
       return
     }
 
-    try {
-      setIsLoading(true)
-      const response = await fetch('/api/trips')
-      if (!response.ok) {
-        throw new Error('Failed to fetch trips')
-      }
-      const data = await response.json()
-      setTrips(data.trips || [])
-    } catch (error) {
-      console.error('Failed to fetch trips:', error)
-      showToast('Failed to load trips', 'error')
-    } finally {
-      setIsLoading(false)
-    }
+    const storedTrips = getStoredTrips(user.id)
+    setTrips(storedTrips)
+    setIsLoading(false)
   }
 
   useEffect(() => {
-    fetchTrips()
-  }, [isLoaded, isSignedIn])
+    loadTrips()
+  }, [isLoaded, isSignedIn, user])
 
   const handleCreateTrip = async (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
     try {
@@ -114,8 +130,15 @@ export default function Home() {
 
       const data = await response.json()
       console.log('[handleCreateTrip] ✅ Trip created:', data.trip)
-      // Refresh trips list
-      await fetchTrips()
+      
+      // Save to localStorage (primary storage)
+      if (user) {
+        const currentTrips = getStoredTrips(user.id)
+        const updatedTrips = [...currentTrips, data.trip]
+        saveTripsToStorage(user.id, updatedTrips)
+        setTrips(updatedTrips)
+      }
+      
       setShowForm(false)
       showToast('Trip created successfully', 'success')
     } catch (error) {

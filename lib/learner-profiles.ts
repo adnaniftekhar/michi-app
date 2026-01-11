@@ -208,9 +208,11 @@ export const LEARNER_PROFILES: Record<string, LearnerProfile> = {
   },
 }
 
+// Sync version - for immediate use (returns cached/localStorage data)
 export function getLearnerProfile(userId: string): LearnerProfile {
   // Check custom profiles first (only if in browser)
   if (typeof window !== 'undefined') {
+    // For demo users, check localStorage
     const customProfile = getCustomProfile(userId)
     if (customProfile) {
       return customProfile
@@ -221,3 +223,29 @@ export function getLearnerProfile(userId: string): LearnerProfile {
   return LEARNER_PROFILES[userId] || LEARNER_PROFILES.alice
 }
 
+// Async version - for Clerk users, fetches from API
+export async function getLearnerProfileAsync(userId: string): Promise<LearnerProfile> {
+  // If this is a Clerk user ID (starts with 'user_'), try to fetch from API
+  if (userId.startsWith('user_') && typeof window !== 'undefined') {
+    try {
+      const response = await fetch('/api/user/profile')
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile')
+      }
+      const data = await response.json()
+      if (data.profile) {
+        // Also cache it in localStorage for faster access
+        const profiles = getCustomProfiles()
+        profiles[userId] = data.profile
+        localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(profiles))
+        return data.profile as LearnerProfile
+      }
+    } catch (error) {
+      console.error('[getLearnerProfileAsync] Error fetching from API:', error)
+      // Fall through to localStorage fallback
+    }
+  }
+  
+  // Fall back to sync version (localStorage or built-in)
+  return getLearnerProfile(userId)
+}

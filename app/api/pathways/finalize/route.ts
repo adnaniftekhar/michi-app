@@ -6,17 +6,19 @@ import type { FinalizePathwayRequest, FinalPathwayPlan, PathwayDraft } from '@/t
 
 export async function POST(request: Request) {
   try {
-    // Verify user is authenticated
-    const { userId } = await auth()
-    if (!userId) {
+    const body: FinalizePathwayRequest & { trip?: any; learnerProfile?: any; chosenDraft?: PathwayDraft; editedDraft?: PathwayDraft } = await request.json()
+    const { tripId, learnerId, chosenDraftId, selectedDates, effortMode, editedDraft } = body
+    
+    // Verify user is authenticated (Clerk) OR using demo user
+    // Allow demo users for local development
+    const { userId } = await auth().catch(() => ({ userId: null }))
+    const isDemoUser = learnerId && ['alice', 'bob', 'sam'].includes(learnerId)
+    if (!userId && !isDemoUser) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
-
-    const body: FinalizePathwayRequest & { trip?: any; learnerProfile?: any; chosenDraft?: PathwayDraft; editedDraft?: PathwayDraft } = await request.json()
-    const { tripId, learnerId, chosenDraftId, selectedDates, effortMode, editedDraft } = body
 
     // Validate required fields
     if (!tripId || !learnerId || !chosenDraftId || !selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0 || !effortMode) {
@@ -378,6 +380,7 @@ async function getTripLocationCoordinates(location: string): Promise<{ lat: numb
   try {
     const apiKey = process.env.PLACES_API_KEY
     if (!apiKey) {
+      console.warn(`[getTripLocationCoordinates] PLACES_API_KEY is not configured. Add it to .env.local to enable location resolution.`)
       return null
     }
 
@@ -385,7 +388,11 @@ async function getTripLocationCoordinates(location: string): Promise<{ lat: numb
     const placeData = await resolvePlace({ query: location }, apiKey)
     return placeData.location
   } catch (error) {
-    console.warn(`Failed to resolve location coordinates for "${location}":`, error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error(`[getTripLocationCoordinates] Failed to resolve location coordinates for "${location}":`, errorMessage)
+    if (errorMessage.includes('API key') || errorMessage.includes('quota') || errorMessage.includes('denied')) {
+      console.error(`[getTripLocationCoordinates] Places API authentication issue. Check your PLACES_API_KEY in .env.local`)
+    }
     return null
   }
 }

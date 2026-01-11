@@ -130,49 +130,94 @@ export function MapModal({ isOpen, onClose, location, activityTitle, coordinates
     if (!isOpen) return
 
     const fetchMapsKey = async () => {
+      console.log('[MapModal] 🔍 Starting Maps API key fetch...')
       try {
+        console.log('[MapModal] 📡 Fetching /api/public-config...')
         const response = await fetch('/api/public-config')
+        console.log('[MapModal] 📥 Response status:', response.status, response.statusText)
+        
         if (!response.ok) {
+          console.error('[MapModal] ❌ public-config API returned error:', response.status, response.statusText)
           setMapsStatus('failed')
           return
         }
 
         const data = await response.json()
+        console.log('[MapModal] 📦 Response data:', {
+          hasMapsBrowserKey: !!data.mapsBrowserKey,
+          keyLength: data.mapsBrowserKey?.length || 0,
+          keyPrefix: data.mapsBrowserKey ? data.mapsBrowserKey.substring(0, 8) + '...' : 'empty',
+          fullData: data
+        })
+        
         const key = data.mapsBrowserKey || ''
 
         if (!key || key.trim().length === 0) {
-          // No key available - use static map only
+          console.error('[MapModal] ❌ Maps API key is empty or missing')
+          console.error('[MapModal] 💡 Solution: Add NEXT_PUBLIC_MAPS_BROWSER_KEY to .env.local and restart server')
           setMapsStatus('failed')
           return
         }
 
+        console.log('[MapModal] ✅ Maps API key received, length:', key.length)
         setMapsKey(key)
         setMapsStatus('loading')
 
         // Load Google Maps using @googlemaps/js-api-loader functional API
         try {
+          console.log('[MapModal] ⚙️  Configuring Maps API loader...')
           setOptions({
             key: key,
             v: 'weekly',
           })
+          console.log('[MapModal] ✅ Maps API options set')
           
-          // Import the maps library (this loads the API)
+          console.log('[MapModal] 📚 Importing maps library...')
           await importLibrary('maps')
-          // Import places library
+          console.log('[MapModal] ✅ Maps library imported')
+          
+          console.log('[MapModal] 📚 Importing geocoding library...')
+          await importLibrary('geocoding')
+          console.log('[MapModal] ✅ Geocoding library imported')
+          
+          console.log('[MapModal] 📚 Importing places library...')
           await importLibrary('places')
+          console.log('[MapModal] ✅ Places library imported')
           
           // Verify Maps API is ready
+          console.log('[MapModal] 🔍 Verifying Maps API is ready...')
+          console.log('[MapModal] window.google exists:', !!window.google)
+          console.log('[MapModal] window.google.maps exists:', !!window.google?.maps)
+          console.log('[MapModal] window.google.maps.Map exists:', !!window.google?.maps?.Map)
+          
           if (window.google?.maps?.Map) {
+            console.log('[MapModal] ✅ Maps API is ready!')
             setMapsStatus('ready')
           } else {
+            console.error('[MapModal] ❌ Maps API not ready - window.google.maps.Map is missing')
+            console.error('[MapModal] Available:', {
+              hasGoogle: !!window.google,
+              hasMaps: !!window.google?.maps,
+              mapsKeys: window.google?.maps ? Object.keys(window.google.maps) : []
+            })
             setMapsStatus('failed')
           }
         } catch (loadError) {
-          console.error('Failed to load Maps libraries:', loadError)
+          console.error('[MapModal] ❌ Failed to load Maps libraries:', loadError)
+          console.error('[MapModal] Error details:', {
+            name: loadError instanceof Error ? loadError.name : 'Unknown',
+            message: loadError instanceof Error ? loadError.message : String(loadError),
+            stack: loadError instanceof Error ? loadError.stack : undefined
+          })
           setMapsStatus('failed')
         }
       } catch (error) {
-        console.error('Failed to load Maps API:', error)
+        console.error('[MapModal] ❌ Failed to load Maps API:', error)
+        console.error('[MapModal] Error details:', {
+          name: error instanceof Error ? error.name : 'Unknown',
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        })
         setMapsStatus('failed')
       }
     }
@@ -405,6 +450,33 @@ export function MapModal({ isOpen, onClose, location, activityTitle, coordinates
                 }}
               >
                 {location}
+              </p>
+            </div>
+          )}
+
+          {/* Warning: Maps API key not configured */}
+          {mapsStatus === 'failed' && hasCoordinates && (
+            <div
+              style={{
+                textAlign: 'center',
+                color: 'var(--color-text-secondary)',
+                padding: 'var(--spacing-4)',
+                backgroundColor: 'var(--color-background)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                marginBottom: 'var(--spacing-4)',
+              }}
+            >
+              <p style={{ fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-2)' }}>
+                ⚠️ Interactive maps require a Google Maps API key
+              </p>
+              <p
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                Add NEXT_PUBLIC_MAPS_BROWSER_KEY to .env.local and restart the server
               </p>
             </div>
           )}

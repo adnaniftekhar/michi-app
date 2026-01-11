@@ -67,6 +67,15 @@ export async function resolvePlace(
     }
   }
 
+  console.log('[places-api] 📡 Making Places API request:', {
+    url,
+    method: 'POST',
+    query,
+    hasApiKey: !!apiKey,
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'empty',
+    requestBody: JSON.stringify(body)
+  })
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -77,10 +86,33 @@ export async function resolvePlace(
     body: JSON.stringify(body),
   })
 
+  console.log('[places-api] 📥 Places API response:', {
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok,
+    headers: Object.fromEntries(response.headers.entries())
+  })
+
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('Places API resolve error:', response.status, errorText)
-    throw new Error(`Places API error: ${response.status} - ${errorText}`)
+    console.error('[places-api] ❌ Places API resolve error:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText.substring(0, 500), // Limit error text length
+      query,
+      fullError: errorText
+    })
+    
+    // Provide helpful error messages
+    if (response.status === 403 || errorText.includes('API key')) {
+      console.error('[places-api] 💡 Authentication issue - check API key validity and Places API (New) is enabled')
+      throw new Error(`Places API authentication failed. Check your PLACES_API_KEY is valid and has Places API (New) enabled.`)
+    } else if (response.status === 429 || errorText.includes('quota')) {
+      console.error('[places-api] 💡 Quota issue - check Google Cloud billing and quotas')
+      throw new Error(`Places API quota exceeded. Check your Google Cloud billing and quotas.`)
+    } else {
+      throw new Error(`Places API error: ${response.status} - ${errorText.substring(0, 200)}`)
+    }
   }
 
   const data = await response.json()

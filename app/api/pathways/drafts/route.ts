@@ -9,18 +9,7 @@ export async function POST(request: Request) {
   try {
     console.log('[Pathway Drafts API] Request received')
     
-    // Verify user is authenticated
-    const { userId } = await auth()
-    console.log('[Pathway Drafts API] Auth check:', { hasUserId: !!userId })
-    
-    if (!userId) {
-      console.error('[Pathway Drafts API] Unauthorized - no userId')
-      return NextResponse.json(
-        { error: 'Unauthorized', details: 'Please sign in to generate pathway drafts' },
-        { status: 401 }
-      )
-    }
-
+    // Parse body first to check for demo user
     let body: any
     try {
       body = await request.json()
@@ -37,6 +26,21 @@ export async function POST(request: Request) {
     }
     
     const { tripId, learnerId, selectedDates, effortMode } = body
+    
+    // Verify user is authenticated (Clerk) OR using demo user
+    // Allow demo users for local development
+    const { userId } = await auth().catch(() => ({ userId: null }))
+    console.log('[Pathway Drafts API] Auth check:', { hasUserId: !!userId, learnerId })
+    
+    // Allow if authenticated OR if using demo user (learnerId is a demo user ID)
+    const isDemoUser = learnerId && ['alice', 'bob', 'sam'].includes(learnerId)
+    if (!userId && !isDemoUser) {
+      console.error('[Pathway Drafts API] Unauthorized - no userId and not a demo user')
+      return NextResponse.json(
+        { error: 'Unauthorized', details: 'Please sign in to generate pathway drafts' },
+        { status: 401 }
+      )
+    }
 
     // Validate required fields
     if (!tripId || !learnerId || !selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0 || !effortMode) {

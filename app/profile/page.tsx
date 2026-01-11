@@ -1,7 +1,7 @@
 'use client'
 
 import { useDemoUser } from '@/contexts/DemoUserContext'
-import { getLearnerProfile } from '@/lib/learner-profiles'
+import { getLearnerProfile, getLearnerProfileAsync } from '@/lib/learner-profiles'
 import { saveCustomProfile, saveCustomUser } from '@/lib/custom-users'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -20,35 +20,55 @@ export default function ProfilePage() {
   // Load profile only on client side to avoid hydration mismatch
   useEffect(() => {
     setMounted(true)
-    const initialProfile = getLearnerProfile(currentUserId)
-    setProfile(initialProfile)
+    const loadProfile = async () => {
+      // Use async version for Clerk users, sync for demo users
+      const initialProfile = currentUserId.startsWith('user_') 
+        ? await getLearnerProfileAsync(currentUserId)
+        : getLearnerProfile(currentUserId)
+      setProfile(initialProfile)
+    }
+    loadProfile()
   }, [currentUserId])
 
   // Update profile when user changes or when exiting edit mode
   useEffect(() => {
     if (mounted && !isEditing) {
-      const newProfile = getLearnerProfile(currentUserId)
-      setProfile(newProfile)
+      const loadProfile = async () => {
+        // Use async version for Clerk users, sync for demo users
+        const newProfile = currentUserId.startsWith('user_')
+          ? await getLearnerProfileAsync(currentUserId)
+          : getLearnerProfile(currentUserId)
+        setProfile(newProfile)
+      }
+      loadProfile()
     }
   }, [currentUserId, isEditing, mounted])
 
-  const handleSave = (updatedProfile: LearnerProfile) => {
-    // Save profile (works for both custom and demo users - saved profiles override built-in ones)
-    saveCustomProfile(currentUserId, updatedProfile)
-    
-    // Update the user's name to match the profile name (works for both custom and demo users)
-    const updatedUser = {
-      ...currentUser,
-      name: updatedProfile.name,
-      isCustom: currentUser.isCustom || true, // Mark as custom if it wasn't already
+  const handleSave = async (updatedProfile: LearnerProfile) => {
+    try {
+      // Save profile (works for both custom and demo users - saved profiles override built-in ones)
+      // This will save to API if user is authenticated, localStorage otherwise
+      await saveCustomProfile(currentUserId, updatedProfile)
+      
+      // Update the user's name to match the profile name (works for both custom and demo users)
+      const updatedUser = {
+        ...currentUser,
+        name: updatedProfile.name,
+        isCustom: currentUser.isCustom || true, // Mark as custom if it wasn't already
+      }
+      saveCustomUser(updatedUser)
+      
+      // Update the profile state to reflect saved changes
+      const savedProfile = currentUserId.startsWith('user_')
+        ? await getLearnerProfileAsync(currentUserId)
+        : getLearnerProfile(currentUserId)
+      setProfile(savedProfile)
+      setIsEditing(false)
+      showToast('Profile updated', 'success')
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      showToast('Failed to save profile', 'error')
     }
-    saveCustomUser(updatedUser)
-    
-    // Update the profile state to reflect saved changes
-    const savedProfile = getLearnerProfile(currentUserId)
-    setProfile(savedProfile)
-    setIsEditing(false)
-    showToast('Profile updated', 'success')
   }
 
   // Show loading state until mounted

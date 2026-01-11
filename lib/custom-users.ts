@@ -53,9 +53,34 @@ export function getCustomProfiles(): Record<string, LearnerProfile> {
   }
 }
 
-export function saveCustomProfile(userId: string, profile: LearnerProfile): void {
+export async function saveCustomProfile(userId: string, profile: LearnerProfile): Promise<void> {
   if (typeof window === 'undefined') return
   
+  // Check if this is a Clerk user ID (starts with 'user_')
+  if (userId.startsWith('user_')) {
+    // Save to API for authenticated users (syncs across devices)
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile }),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('[saveCustomProfile] Failed to save profile to API:', error)
+        // Fall back to localStorage if API fails
+      } else {
+        console.log('[saveCustomProfile] ✅ Profile saved to API for user:', userId)
+        return // Successfully saved to API
+      }
+    } catch (error) {
+      console.error('[saveCustomProfile] Error saving profile to API:', error)
+      // Fall back to localStorage if API fails
+    }
+  }
+  
+  // Fallback: Save to localStorage (for demo users or if API fails)
   const profiles = getCustomProfiles()
   profiles[userId] = profile
   localStorage.setItem(CUSTOM_PROFILES_KEY, JSON.stringify(profiles))

@@ -17,7 +17,7 @@ import { ChoosePathwayModal } from './ChoosePathwayModal'
 import type { AIPlanResponse } from '@/lib/ai-plan-schema'
 import type { FinalPathwayPlan } from '@/types'
 import { useDemoUser } from '@/contexts/DemoUserContext'
-import { getLearnerProfile } from '@/lib/learner-profiles'
+import { getLearnerProfile, getLearnerProfileAsync } from '@/lib/learner-profiles'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { getUserSettings } from '@/lib/user-settings'
 import { detectActivityType, getActivityIconUrl, getActivityImageAlt, getActivityIconFallback } from '@/lib/activity-images'
@@ -273,6 +273,7 @@ export function ScheduleItineraryTab({
   timezone,
 }: ScheduleItineraryTabProps) {
   const { currentUserId } = useDemoUser()
+  const [learnerProfile, setLearnerProfile] = useState<any>(null)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
   const [showOptionsModal, setShowOptionsModal] = useState(false)
   const [showChoosePathwayModal, setShowChoosePathwayModal] = useState(false)
@@ -284,6 +285,17 @@ export function ScheduleItineraryTab({
   const [showImagesAndMaps, setShowImagesAndMaps] = useState(true)
   const [generationOptions, setGenerationOptions] = useState<PathwayGenerationOptions | null>(null)
   const [mapsBrowserKey, setMapsBrowserKey] = useState<string>('')
+
+  // Load learner profile (async for Clerk users)
+  useEffect(() => {
+    const loadProfile = async () => {
+      const profile = currentUserId.startsWith('user_')
+        ? await getLearnerProfileAsync(currentUserId)
+        : getLearnerProfile(currentUserId)
+      setLearnerProfile(profile)
+    }
+    loadProfile()
+  }, [currentUserId])
 
   // Fetch Maps API key on mount
   useEffect(() => {
@@ -348,19 +360,19 @@ export function ScheduleItineraryTab({
     setGenerationOptions(options)
 
     try {
-      const learnerProfile = getLearnerProfile(currentUserId)
+      const profile = learnerProfile || getLearnerProfile(currentUserId)
       
       // Merge profile overrides
       const mergedProfile = {
-        ...learnerProfile,
+        ...profile,
         pblProfile: {
-          ...learnerProfile.pblProfile,
-          currentLevel: options.profileOverrides.currentLevel || learnerProfile.pblProfile.currentLevel,
-          preferredArtifactTypes: options.profileOverrides.preferredArtifactTypes || learnerProfile.pblProfile.preferredArtifactTypes,
+          ...profile.pblProfile,
+          currentLevel: options.profileOverrides.currentLevel || profile.pblProfile.currentLevel,
+          preferredArtifactTypes: options.profileOverrides.preferredArtifactTypes || profile.pblProfile.preferredArtifactTypes,
         },
         experientialProfile: {
-          ...learnerProfile.experientialProfile,
-          reflectionStyle: options.profileOverrides.reflectionStyle || learnerProfile.experientialProfile.reflectionStyle,
+          ...profile.experientialProfile,
+          reflectionStyle: options.profileOverrides.reflectionStyle || profile.experientialProfile.reflectionStyle,
         },
       }
 
@@ -478,6 +490,32 @@ export function ScheduleItineraryTab({
     }
 
     onScheduleUpdate(updated)
+    
+    // Save pathway to API if user is authenticated (Clerk user ID starts with 'user_')
+    if (currentUserId.startsWith('user_')) {
+      try {
+        const response = await fetch('/api/user/pathways', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.id,
+            pathway: finalPlan,
+          }),
+        })
+        
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('[handleFinalizePathway] Failed to save pathway to API:', error)
+          // Don't block the UI if saving fails
+        } else {
+          console.log('[handleFinalizePathway] ✅ Pathway saved to API for trip:', trip.id)
+        }
+      } catch (error) {
+        console.error('[handleFinalizePathway] Error saving pathway to API:', error)
+        // Don't block the UI if saving fails
+      }
+    }
+    
     showToast(`Added ${newBlocks.length} activities to your schedule`, 'success')
   }
 
@@ -1534,7 +1572,7 @@ export function ScheduleItineraryTab({
         onClose={() => setShowOptionsModal(false)}
         onGenerate={handleGenerateWithOptions}
         trip={trip}
-        learnerProfile={getLearnerProfile(currentUserId)}
+        learnerProfile={learnerProfile || getLearnerProfile(currentUserId)}
         defaultLearningTarget={trip.learningTarget}
       />
       {trip.learningTarget && (
@@ -1543,7 +1581,7 @@ export function ScheduleItineraryTab({
           onClose={() => setShowChoosePathwayModal(false)}
           onFinalize={handleFinalizePathway}
           trip={trip}
-          learnerProfile={getLearnerProfile(currentUserId)}
+          learnerProfile={learnerProfile || getLearnerProfile(currentUserId)}
           learnerId={currentUserId}
           selectedDates={(() => {
             // Generate all dates in trip range

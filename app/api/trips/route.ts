@@ -97,29 +97,98 @@ export async function POST(request: Request) {
       ...tripsMetadata,
     }
     
+    // Calculate metadata size for logging and validation
+    const metadataString = JSON.stringify(newMetadata)
+    const metadataSize = metadataString.length
+    const metadataSizeKB = (metadataSize / 1024).toFixed(2)
+    
     console.log('[Trips API] Metadata to save:', {
       keys: Object.keys(newMetadata),
       tripsCount: Array.isArray(newMetadata.trips) ? newMetadata.trips.length : 'not array',
       hasPathways: !!newMetadata.pathways,
       hasScheduleBlocks: !!newMetadata.scheduleBlocks,
+      metadataSize,
+      metadataSizeKB: `${metadataSizeKB} KB`,
     })
 
+    // Clerk has a metadata size limit (typically 10KB for privateMetadata)
+    // Warn if approaching limit
+    if (metadataSize > 8000) {
+      console.warn('[Trips API] ⚠️ Metadata size is large:', `${metadataSizeKB} KB. Clerk limit is ~10KB`)
+    }
+
     // Save to Clerk - pass entire metadata object
-    try {
-      await client.users.updateUserMetadata(userId, {
-        privateMetadata: newMetadata,
-      })
-      console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id)
-    } catch (metadataError) {
+    // Retry logic for production reliability
+    let lastError: any = null
+    const maxRetries = 3
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await client.users.updateUserMetadata(userId, {
+          privateMetadata: newMetadata,
+        })
+        console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id, `(attempt ${attempt})`)
+        break // Success, exit retry loop
+      } catch (metadataError) {
+        lastError = metadataError
+        const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError)
+        
+        // Don't retry on certain errors
+        if (
+          errorMessage.includes('size') || 
+          errorMessage.includes('limit') || 
+          errorMessage.includes('too large') ||
+          errorMessage.includes('permission') ||
+          errorMessage.includes('403') ||
+          errorMessage.includes('401')
+        ) {
+          throw metadataError // Don't retry, throw immediately
+        }
+        
+        // Retry on network/timeout errors
+        if (attempt < maxRetries) {
+          const delay = attempt * 500 // Exponential backoff: 500ms, 1000ms, 1500ms
+          console.warn(`[Trips API] ⚠️ Metadata update failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`, {
+            error: errorMessage,
+          })
+          await new Promise(resolve => setTimeout(resolve, delay))
+        } else {
+          // Last attempt failed
+          throw metadataError
+        }
+      }
+    }
+    
+    // If we get here and lastError exists, something went wrong
+    if (lastError) {
+      const metadataError = lastError
+      const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError)
+      const errorName = metadataError instanceof Error ? metadataError.name : 'UnknownError'
+      
       console.error('[Trips API] ❌ Error updating user metadata:', metadataError)
       console.error('[Trips API] Metadata update error details:', {
-        message: metadataError instanceof Error ? metadataError.message : String(metadataError),
-        stack: metadataError instanceof Error ? metadataError.stack : undefined,
-        name: metadataError instanceof Error ? metadataError.name : undefined,
+        message: errorMessage,
+        name: errorName,
         userId,
-        metadataSize: JSON.stringify(newMetadata).length,
+        metadataSize,
+        metadataSizeKB: `${metadataSizeKB} KB`,
         tripsCount: updatedTrips.length,
+        hasPathways: !!newMetadata.pathways,
+        hasScheduleBlocks: !!newMetadata.scheduleBlocks,
+        pathwaysKeys: newMetadata.pathways ? Object.keys(newMetadata.pathways).length : 0,
+        scheduleBlocksKeys: newMetadata.scheduleBlocks ? Object.keys(newMetadata.scheduleBlocks).length : 0,
       })
+      
+      // Provide more specific error messages for common issues
+      if (errorMessage.includes('size') || errorMessage.includes('limit') || errorMessage.includes('too large')) {
+        throw new Error('Metadata size limit exceeded. Please try deleting old trips or pathways.')
+      }
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        throw new Error('Too many requests. Please wait a moment and try again.')
+      }
+      if (errorMessage.includes('permission') || errorMessage.includes('403')) {
+        throw new Error('Permission denied. Please check your authentication.')
+      }
+      
       throw metadataError
     }
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CreateTripForm } from '@/components/CreateTripForm'
 import { showToast } from '@/components/ui/Toast'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
 export default function Home() {
   const { isSignedIn, isLoaded } = useUser()
@@ -109,7 +110,18 @@ export default function Home() {
         </div>
       )}
 
-      {trips.length === 0 ? (
+      {isLoading ? (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 'var(--spacing-16)',
+          }}
+        >
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : trips.length === 0 ? (
         <EmptyState
           message="No trips yet. Create your first trip to get started."
           action={

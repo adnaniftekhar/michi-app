@@ -12,6 +12,7 @@ import type { Trip } from '@/types'
 // Export route config to ensure proper handling
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30 // 30 seconds max
 
 // GET /api/trips - Get all trips for the current user
 export async function GET() {

@@ -9,6 +9,10 @@ import {
 } from '@/lib/trips-storage-clerk'
 import type { Trip } from '@/types'
 
+// Export route config to ensure proper handling
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // GET /api/trips - Get all trips for the current user
 export async function GET() {
   try {
@@ -38,7 +42,9 @@ export async function GET() {
 // POST /api/trips - Create a new trip
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-  console.log(`[Trips API] [${requestId}] POST request received`)
+  console.log(`[Trips API] [${requestId}] ========== POST REQUEST START ==========`)
+  console.log(`[Trips API] [${requestId}] Request URL:`, request.url)
+  console.log(`[Trips API] [${requestId}] Request method:`, request.method)
   
   try {
     // Step 1: Authenticate user
@@ -73,20 +79,52 @@ export async function POST(request: Request) {
 
     // Step 2: Parse request body
     console.log(`[Trips API] [${requestId}] Step 2: Parsing request body...`)
+    console.log(`[Trips API] [${requestId}] Request headers:`, {
+      contentType: request.headers.get('content-type'),
+      contentLength: request.headers.get('content-length'),
+      userAgent: request.headers.get('user-agent'),
+    })
+    
     let body: any
     try {
+      // Use request.json() directly - it handles the body stream correctly
       body = await request.json()
-      console.log(`[Trips API] [${requestId}] Request body parsed:`, {
+      console.log(`[Trips API] [${requestId}] ✅ Request body parsed successfully:`, {
         hasTitle: !!body.title,
         hasStartDate: !!body.startDate,
         hasEndDate: !!body.endDate,
         hasBaseLocation: !!body.baseLocation,
         title: body.title,
+        baseLocation: body.baseLocation,
+        learningTarget: body.learningTarget,
+        keys: Object.keys(body),
       })
     } catch (parseError) {
-      console.error(`[Trips API] [${requestId}] ❌ JSON parse error:`, parseError)
+      const errorMsg = parseError instanceof Error ? parseError.message : String(parseError)
+      const errorName = parseError instanceof Error ? parseError.name : 'Unknown'
+      console.error(`[Trips API] [${requestId}] ❌ JSON parse error:`, {
+        error: errorMsg,
+        name: errorName,
+        stack: parseError instanceof Error ? parseError.stack : undefined,
+        contentType: request.headers.get('content-type'),
+      })
+      
+      // If it's "Unprocessable Entity", it might be a Next.js routing issue
+      if (errorMsg.includes('Unprocessable Entity') || errorName === 'UnprocessableEntity') {
+        console.error(`[Trips API] [${requestId}] ⚠️ Unprocessable Entity error - this might be a Next.js routing issue`)
+        return NextResponse.json(
+          { 
+            error: 'Request parsing failed', 
+            details: 'The request body could not be processed. Please check the request format.',
+            requestId,
+            hint: 'Ensure Content-Type is application/json and the body is valid JSON',
+          },
+          { status: 422 }
+        )
+      }
+      
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: 'Invalid JSON in request body', details: errorMsg, requestId },
         { status: 400 }
       )
     }

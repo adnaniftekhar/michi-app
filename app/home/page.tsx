@@ -69,7 +69,21 @@ export default function Home() {
         } catch (e) {
           errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
         }
-        console.error('[handleCreateTrip] API error:', errorData)
+        console.error('[handleCreateTrip] ❌ API ERROR:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          details: errorData.details,
+          requestId: errorData.requestId,
+          debug: errorData.debug,
+          fullError: errorData,
+        })
+        
+        // Show detailed error in console for debugging
+        if (errorData.requestId) {
+          console.error(`[handleCreateTrip] Request ID: ${errorData.requestId} - Use this to find logs in production`)
+        }
+        
         throw new Error(errorData.error || errorData.details || 'Failed to create trip')
       }
 

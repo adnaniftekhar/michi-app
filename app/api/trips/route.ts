@@ -335,13 +335,29 @@ export async function POST(request: Request) {
       )
     }
     
-    return NextResponse.json(
-      { 
-        error: 'Failed to create trip',
-        details: errorMessage,
-        requestId, // Include request ID for debugging
-      },
-      { status: 500 }
-    )
+    // In production, expose more details for debugging (but sanitize sensitive info)
+    const errorResponse: any = {
+      error: 'Failed to create trip',
+      details: errorMessage,
+      requestId, // Include request ID for debugging
+    }
+    
+    // Add more context for production debugging
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+      errorResponse.debug = {
+        errorName: errorName,
+        hasStack: !!errorStack,
+        // Don't expose full stack in production, but log it server-side
+      }
+      // Log full details server-side (these will appear in Vercel/Cloud Run logs)
+      console.error(`[Trips API] [${requestId}] PRODUCTION ERROR - Full details:`, {
+        message: errorMessage,
+        name: errorName,
+        stack: errorStack,
+        userId: userIdForLogging,
+      })
+    }
+    
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }

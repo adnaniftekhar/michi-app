@@ -174,8 +174,63 @@ export async function POST(request: Request) {
         hasBaseLocation: !!baseLocation,
       })
       return NextResponse.json(
-        { error: 'Missing required fields: title, startDate, endDate, baseLocation' },
+        { error: 'Missing required fields: title, startDate, endDate, baseLocation', requestId },
         { status: 400 }
+      )
+    }
+
+    // Step 3.5: Validate field formats and types (422 for semantic validation errors)
+    console.log(`[Trips API] [${requestId}] Step 3.5: Validating field formats...`)
+    const validationErrors: string[] = []
+    
+    // Validate title
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      validationErrors.push('title must be a non-empty string')
+    }
+    
+    // Validate dates
+    if (typeof startDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      validationErrors.push('startDate must be in YYYY-MM-DD format')
+    }
+    if (typeof endDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      validationErrors.push('endDate must be in YYYY-MM-DD format')
+    }
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      validationErrors.push('startDate must be before or equal to endDate')
+    }
+    
+    // Validate baseLocation
+    if (typeof baseLocation !== 'string' || baseLocation.trim().length === 0) {
+      validationErrors.push('baseLocation must be a non-empty string')
+    }
+    
+    // Validate learningTarget if provided
+    if (learningTarget !== undefined && learningTarget !== null) {
+      if (typeof learningTarget !== 'object' || Array.isArray(learningTarget)) {
+        validationErrors.push('learningTarget must be an object')
+      } else {
+        const validTracks = ['15min', '60min', '4hrs', 'weekly']
+        if (!learningTarget.track || !validTracks.includes(learningTarget.track)) {
+          validationErrors.push(`learningTarget.track must be one of: ${validTracks.join(', ')}`)
+        }
+        if (learningTarget.track === 'weekly') {
+          if (!learningTarget.weeklyHours || typeof learningTarget.weeklyHours !== 'number' || learningTarget.weeklyHours <= 0) {
+            validationErrors.push('learningTarget.weeklyHours is required and must be a positive number when track is "weekly"')
+          }
+        }
+      }
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error(`[Trips API] [${requestId}] ❌ Validation errors:`, validationErrors)
+      return NextResponse.json(
+        { 
+          error: 'Validation failed', 
+          details: 'Unprocessable Entity',
+          validationErrors,
+          requestId 
+        },
+        { status: 422 }
       )
     }
 

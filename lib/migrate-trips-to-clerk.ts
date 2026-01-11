@@ -54,8 +54,8 @@ export async function migrateTripsToClerk(userId: string): Promise<number> {
     // Save to Clerk
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
-        ...user.privateMetadata,
-        trips: tripsDataToMetadata(updatedTrips),
+        ...(user.privateMetadata || {}),
+        ...tripsDataToMetadata(updatedTrips),
       },
     })
 

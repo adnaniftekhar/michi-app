@@ -100,8 +100,8 @@ export async function PATCH(
     // Save to Clerk
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
-        ...user.privateMetadata,
-        trips: tripsDataToMetadata(updatedTrips),
+        ...(user.privateMetadata || {}),
+        ...tripsDataToMetadata(updatedTrips),
       },
     })
 
@@ -153,8 +153,8 @@ export async function DELETE(
     // Save to Clerk
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
-        ...user.privateMetadata,
-        trips: tripsDataToMetadata(updatedTrips),
+        ...(user.privateMetadata || {}),
+        ...tripsDataToMetadata(updatedTrips),
       },
     })
 

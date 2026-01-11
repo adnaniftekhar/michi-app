@@ -77,8 +77,8 @@ export async function POST(request: Request) {
     // Save to Clerk
     await client.users.updateUserMetadata(userId, {
       privateMetadata: {
-        ...user.privateMetadata,
-        trips: tripsDataToMetadata(updatedTrips),
+        ...(user.privateMetadata || {}),
+        ...tripsDataToMetadata(updatedTrips),
       },
     })
 
@@ -87,8 +87,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
     console.error('[Trips API] POST error:', error)
+    console.error('[Trips API] POST error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    })
     return NextResponse.json(
-      { error: 'Failed to create trip' },
+      { 
+        error: 'Failed to create trip',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     )
   }

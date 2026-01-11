@@ -18,27 +18,49 @@ interface TripsData {
 /**
  * Get trips from Clerk user metadata
  * This is a helper that will be used by API routes
+ * Metadata structure: { trips: TripRecord[] }
  */
 export function getTripsFromMetadata(metadata: any): Trip[] {
-  const tripsData = (metadata?.trips || { trips: [] }) as TripsData
-  return tripsData.trips.map((record) => record.trip)
+  // Handle both old format { trips: { trips: [...] } } and new format { trips: [...] }
+  let tripRecords: TripRecord[] = []
+  if (metadata?.trips) {
+    if (Array.isArray(metadata.trips)) {
+      // New format: trips is directly an array
+      tripRecords = metadata.trips
+    } else if (metadata.trips.trips && Array.isArray(metadata.trips.trips)) {
+      // Old format: trips.trips is the array (for backward compatibility)
+      tripRecords = metadata.trips.trips
+    }
+  }
+  return tripRecords.map((record) => record.trip)
 }
 
 /**
  * Get trip records (with metadata) from Clerk user metadata
  * Returns the full TripRecord[] array, not just Trip[]
+ * Metadata structure: { trips: TripRecord[] }
  */
 export function getTripRecordsFromMetadata(metadata: any): TripRecord[] {
-  const tripsData = (metadata?.trips || { trips: [] }) as TripsData
-  return tripsData.trips || []
+  // Handle both old format { trips: { trips: [...] } } and new format { trips: [...] }
+  if (metadata?.trips) {
+    if (Array.isArray(metadata.trips)) {
+      // New format: trips is directly an array
+      return metadata.trips
+    } else if (metadata.trips.trips && Array.isArray(metadata.trips.trips)) {
+      // Old format: trips.trips is the array (for backward compatibility)
+      return metadata.trips.trips
+    }
+  }
+  return []
 }
 
 /**
  * Get a single trip from metadata
+ * Metadata structure: { trips: TripRecord[] }
  */
 export function getTripFromMetadata(metadata: any, tripId: string): Trip | null {
-  const tripsData = (metadata?.trips || { trips: [] }) as TripsData
-  const record = tripsData.trips.find((t) => t.id === tripId)
+  const tripRecords = getTripRecordsFromMetadata(metadata)
+  const record = tripRecords.find((t) => t.id === tripId)
   return record ? record.trip : null
 }
 
@@ -91,11 +113,10 @@ export function removeTripFromData(trips: TripRecord[], tripId: string): TripRec
 
 /**
  * Convert trips data to metadata format
+ * Returns the structure: { trips: TripRecord[] }
  */
 export function tripsDataToMetadata(trips: TripRecord[]): any {
   return {
-    trips: {
-      trips,
-    },
+    trips,
   }
 }

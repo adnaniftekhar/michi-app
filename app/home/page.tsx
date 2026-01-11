@@ -69,22 +69,41 @@ export default function Home() {
         } catch (e) {
           errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
         }
-        console.error('[handleCreateTrip] ❌ API ERROR:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData.error,
-          details: errorData.details,
-          requestId: errorData.requestId,
-          debug: errorData.debug,
-          fullError: errorData,
-        })
+        // Log FULL error details for debugging
+        console.group('🚨 TRIP CREATION FAILED - Full Error Details')
+        console.error('Status:', response.status, response.statusText)
+        console.error('Error:', errorData.error)
+        console.error('Details:', errorData.details)
+        console.error('Request ID:', errorData.requestId)
+        console.error('Full Error Object:', errorData)
+        console.error('Response Headers:', Object.fromEntries(response.headers.entries()))
+        
+        // Try to get response text if JSON parsing failed
+        if (!errorData.error && !errorData.details) {
+          try {
+            const text = await response.clone().text()
+            console.error('Raw Response Text:', text)
+          } catch (e) {
+            console.error('Could not read response text')
+          }
+        }
+        
+        console.groupEnd()
         
         // Show detailed error in console for debugging
         if (errorData.requestId) {
-          console.error(`[handleCreateTrip] Request ID: ${errorData.requestId} - Use this to find logs in production`)
+          console.error(`[handleCreateTrip] 🔍 Request ID: ${errorData.requestId} - Use this to find logs in production`)
         }
         
-        throw new Error(errorData.error || errorData.details || 'Failed to create trip')
+        // Create a more detailed error message
+        const errorMsg = errorData.details || errorData.error || 'Failed to create trip'
+        const detailedError = new Error(errorMsg)
+        // Attach full error data to the error object for inspection
+        ;(detailedError as any).errorData = errorData
+        ;(detailedError as any).status = response.status
+        ;(detailedError as any).requestId = errorData.requestId
+        
+        throw detailedError
       }
 
       const data = await response.json()

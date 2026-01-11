@@ -330,33 +330,33 @@ export async function POST(request: Request) {
     // Check for specific Clerk errors
     if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
       return NextResponse.json(
-        { error: 'Unauthorized - please sign in to create trips', details: errorMessage },
+        { error: 'Unauthorized - please sign in to create trips', details: errorMessage, requestId },
         { status: 401 }
       )
     }
     
-    // In production, expose more details for debugging (but sanitize sensitive info)
+    // ALWAYS expose detailed error information for debugging
+    // This helps identify production issues quickly
     const errorResponse: any = {
       error: 'Failed to create trip',
       details: errorMessage,
       requestId, // Include request ID for debugging
+      errorName: errorName,
+      // Include stack trace in production for debugging (sanitized)
+      stack: errorStack ? errorStack.split('\n').slice(0, 5).join('\n') : undefined, // First 5 lines only
     }
     
-    // Add more context for production debugging
-    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-      errorResponse.debug = {
-        errorName: errorName,
-        hasStack: !!errorStack,
-        // Don't expose full stack in production, but log it server-side
-      }
-      // Log full details server-side (these will appear in Vercel/Cloud Run logs)
-      console.error(`[Trips API] [${requestId}] PRODUCTION ERROR - Full details:`, {
-        message: errorMessage,
-        name: errorName,
-        stack: errorStack,
-        userId: userIdForLogging,
-      })
-    }
+    // Log full details server-side (these will appear in Vercel/Cloud Run logs)
+    console.error(`[Trips API] [${requestId}] ❌❌❌ PRODUCTION ERROR - Full details:`, {
+      requestId,
+      message: errorMessage,
+      name: errorName,
+      stack: errorStack,
+      userId: userIdForLogging,
+      environment: process.env.NODE_ENV,
+      isVercel: !!process.env.VERCEL,
+      timestamp: new Date().toISOString(),
+    })
     
     return NextResponse.json(errorResponse, { status: 500 })
   }

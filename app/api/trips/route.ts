@@ -46,41 +46,37 @@ export async function POST(request: Request) {
       )
     }
 
-    // Parse request body - catch Next.js runtime parsing errors
+    // CRITICAL: Read body as text FIRST, then parse
+    // This avoids the body stream consumption issue where request.json() 
+    // consumes the stream and then we can't fallback to request.text()
     let body: any
+    let bodyText: string
     try {
-      body = await request.json()
+      bodyText = await request.text()
+    } catch (readError) {
+      console.error('[Trips API] Failed to read request body:', readError)
+      return NextResponse.json(
+        { error: 'Failed to read request body', details: readError instanceof Error ? readError.message : String(readError) },
+        { status: 400 }
+      )
+    }
+
+    if (!bodyText || bodyText.trim() === '') {
+      return NextResponse.json(
+        { error: 'Request body is empty' },
+        { status: 400 }
+      )
+    }
+
+    try {
+      body = JSON.parse(bodyText)
     } catch (parseError) {
-      // Next.js runtime sometimes throws "Unprocessable Entity" before our handler
-      const errorMsg = parseError instanceof Error ? parseError.message : String(parseError)
-      console.error('[Trips API] Request body parse error:', errorMsg)
-      
-      // If it's the Next.js "Unprocessable Entity" error, try reading as text and parsing manually
-      if (errorMsg.includes('Unprocessable Entity') || errorMsg.includes('UnprocessableEntity')) {
-        try {
-          const bodyText = await request.text()
-          if (bodyText) {
-            body = JSON.parse(bodyText)
-            console.log('[Trips API] Successfully parsed body after Next.js error')
-          } else {
-            return NextResponse.json(
-              { error: 'Request body is empty' },
-              { status: 400 }
-            )
-          }
-        } catch (manualParseError) {
-          console.error('[Trips API] Manual parse also failed:', manualParseError)
-          return NextResponse.json(
-            { error: 'Invalid JSON in request body', details: errorMsg },
-            { status: 400 }
-          )
-        }
-      } else {
-        return NextResponse.json(
-          { error: 'Invalid JSON in request body', details: errorMsg },
-          { status: 400 }
-        )
-      }
+      console.error('[Trips API] JSON parse error:', parseError)
+      console.error('[Trips API] Body text was:', bodyText.substring(0, 500))
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body', details: parseError instanceof Error ? parseError.message : String(parseError) },
+        { status: 400 }
+      )
     }
 
     const { title, startDate, endDate, baseLocation, learningTarget } = body

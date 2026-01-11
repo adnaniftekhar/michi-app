@@ -8,12 +8,34 @@ function getStorageKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`
 }
 
-function shouldSeed(): boolean {
+function shouldSeed(userId: string): boolean {
   if (typeof window === 'undefined') return false
   
+  // Check if user already has data - if so, don't seed (preserve their data)
+  const key = getStorageKey(userId)
+  const existingData = localStorage.getItem(key)
+  if (existingData) {
+    try {
+      const parsed = JSON.parse(existingData) as AppData
+      // If user has trips or any data, don't overwrite it
+      if (parsed.trips && parsed.trips.length > 0) {
+        return false
+      }
+      // If user has schedule blocks, itinerary, or logs, don't overwrite
+      if (
+        Object.keys(parsed.scheduleBlocks || {}).length > 0 ||
+        Object.keys(parsed.itinerary || {}).length > 0 ||
+        Object.keys(parsed.activityLogs || {}).length > 0
+      ) {
+        return false
+      }
+    } catch {
+      // If data is corrupted, we'll seed fresh
+    }
+  }
+  
+  // Only seed if no existing data AND version doesn't match
   const storedVersion = localStorage.getItem(SEED_VERSION_KEY)
-  // Only seed if version doesn't match or doesn't exist
-  // If version matches, don't re-seed (user may have cleared data intentionally)
   return storedVersion !== SEED_VERSION
 }
 
@@ -40,9 +62,19 @@ export function getData(userId: string): AppData {
     }
   }
 
-  // Initialize seed data if needed
-  if (shouldSeed()) {
-    initializeSeedData()
+  // Initialize seed data if needed (only for this specific user, and only if they have no data)
+  if (shouldSeed(userId)) {
+    // Only seed for this specific user, don't overwrite other users' data
+    const seedData = generateSeedData()
+    const userSeedData = seedData[userId as DemoUserId]
+    if (userSeedData) {
+      const key = getStorageKey(userId)
+      localStorage.setItem(key, JSON.stringify(userSeedData))
+    }
+    // Set seed version only if it's not already set (don't overwrite if other users have data)
+    if (!localStorage.getItem(SEED_VERSION_KEY)) {
+      localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION)
+    }
   }
 
   const key = getStorageKey(userId)

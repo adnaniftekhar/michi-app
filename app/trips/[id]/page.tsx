@@ -64,24 +64,57 @@ export default function TripDetailPage() {
         const fetchedTrip = data.trip
         setTrip(fetchedTrip)
 
-        // Try to load saved pathway from API first (for cross-device sync)
+        // Try to load saved schedule blocks from API first (for cross-device sync)
         let apiBlocks: ScheduleBlock[] = []
         try {
-          const pathwayResponse = await fetch(`/api/user/pathways?tripId=${tripId}`)
-          if (pathwayResponse.ok) {
-            const pathwayData = await pathwayResponse.json()
-            if (pathwayData.pathway) {
-              console.log('[TripDetailPage] ✅ Loaded saved pathway from API')
-              apiBlocks = pathwayPlanToScheduleBlocks(
-                pathwayData.pathway,
-                tripId,
-                fetchedTrip.baseLocation
-              )
+          const blocksResponse = await fetch(`/api/user/schedule-blocks?tripId=${tripId}`)
+          if (blocksResponse.ok) {
+            const blocksData = await blocksResponse.json()
+            if (blocksData.scheduleBlocks && blocksData.scheduleBlocks.length > 0) {
+              console.log('[TripDetailPage] ✅ Loaded saved schedule blocks from API:', blocksData.scheduleBlocks.length)
+              apiBlocks = blocksData.scheduleBlocks
             }
           }
         } catch (error) {
-          console.warn('[TripDetailPage] Failed to load pathway from API (non-critical):', error)
-          // Continue with localStorage fallback
+          console.warn('[TripDetailPage] Failed to load schedule blocks from API (non-critical):', error)
+          // Continue with pathway/fallback
+        }
+
+        // If no schedule blocks from API, try loading from pathway and converting
+        if (apiBlocks.length === 0) {
+          try {
+            const pathwayResponse = await fetch(`/api/user/pathways?tripId=${tripId}`)
+            if (pathwayResponse.ok) {
+              const pathwayData = await pathwayResponse.json()
+              if (pathwayData.pathway) {
+                console.log('[TripDetailPage] ✅ Loaded saved pathway from API, converting to schedule blocks')
+                apiBlocks = pathwayPlanToScheduleBlocks(
+                  pathwayData.pathway,
+                  tripId,
+                  fetchedTrip.baseLocation
+                )
+                // Save converted blocks to API for future use
+                if (apiBlocks.length > 0 && isSignedIn) {
+                  try {
+                    await fetch('/api/user/schedule-blocks', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        tripId,
+                        scheduleBlocks: apiBlocks,
+                      }),
+                    })
+                    console.log('[TripDetailPage] ✅ Converted pathway blocks saved to API')
+                  } catch (error) {
+                    console.warn('[TripDetailPage] Failed to save converted blocks (non-critical):', error)
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[TripDetailPage] Failed to load pathway from API (non-critical):', error)
+            // Continue with localStorage fallback
+          }
         }
 
         // Load from localStorage as fallback or merge with API blocks
@@ -99,7 +132,7 @@ export default function TripDetailPage() {
           localData.scheduleBlocks[tripId] = mergedBlocks
           setData('current', localData)
         } else {
-          // No API pathway, use localStorage
+          // No API blocks, use localStorage
           setScheduleBlocks(localBlocks)
         }
         
@@ -117,7 +150,7 @@ export default function TripDetailPage() {
   }, [isLoaded, isSignedIn, tripId, router])
 
   const saveData = async (updatedBlocks?: ScheduleBlock[], updatedLogs?: ActivityLog[], updatedTripData?: Trip) => {
-    // Save schedule blocks and logs to localStorage (for now)
+    // Save schedule blocks and logs to localStorage (for backward compatibility with demo users)
     const localData = getData('current')
     if (updatedBlocks !== undefined) {
       localData.scheduleBlocks[tripId] = updatedBlocks
@@ -126,6 +159,31 @@ export default function TripDetailPage() {
       localData.activityLogs[tripId] = updatedLogs
     }
     setData('current', localData)
+
+    // Save schedule blocks to API if user is authenticated (Clerk user ID from useUser)
+    if (updatedBlocks !== undefined && isSignedIn) {
+      try {
+        const response = await fetch('/api/user/schedule-blocks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            scheduleBlocks: updatedBlocks,
+          }),
+        })
+        
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('[saveData] Failed to save schedule blocks to API:', error)
+          // Don't block the UI if saving fails
+        } else {
+          console.log('[saveData] ✅ Schedule blocks saved to API for trip:', tripId)
+        }
+      } catch (error) {
+        console.error('[saveData] Error saving schedule blocks to API:', error)
+        // Don't block the UI if saving fails
+      }
+    }
 
     // Save trip to API if updated
     if (updatedTripData && trip) {

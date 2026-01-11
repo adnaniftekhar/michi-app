@@ -491,10 +491,11 @@ export function ScheduleItineraryTab({
 
     onScheduleUpdate(updated)
     
-    // Save pathway to API if user is authenticated (Clerk user ID starts with 'user_')
+    // Save pathway and schedule blocks to API if user is authenticated (Clerk user ID starts with 'user_')
     if (currentUserId.startsWith('user_')) {
       try {
-        const response = await fetch('/api/user/pathways', {
+        // Save pathway
+        const pathwayResponse = await fetch('/api/user/pathways', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -503,15 +504,31 @@ export function ScheduleItineraryTab({
           }),
         })
         
-        if (!response.ok) {
-          const error = await response.json()
+        if (!pathwayResponse.ok) {
+          const error = await pathwayResponse.json()
           console.error('[handleFinalizePathway] Failed to save pathway to API:', error)
-          // Don't block the UI if saving fails
         } else {
           console.log('[handleFinalizePathway] ✅ Pathway saved to API for trip:', trip.id)
         }
+
+        // Also save schedule blocks to API for direct access
+        const blocksResponse = await fetch('/api/user/schedule-blocks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.id,
+            scheduleBlocks: updated,
+          }),
+        })
+        
+        if (!blocksResponse.ok) {
+          const error = await blocksResponse.json()
+          console.error('[handleFinalizePathway] Failed to save schedule blocks to API:', error)
+        } else {
+          console.log('[handleFinalizePathway] ✅ Schedule blocks saved to API for trip:', trip.id)
+        }
       } catch (error) {
-        console.error('[handleFinalizePathway] Error saving pathway to API:', error)
+        console.error('[handleFinalizePathway] Error saving to API:', error)
         // Don't block the UI if saving fails
       }
     }
@@ -803,7 +820,8 @@ export function ScheduleItineraryTab({
           summary: (draft as any).summary,
         }
 
-        const response = await fetch('/api/user/pathways', {
+        // Save pathway
+        const pathwayResponse = await fetch('/api/user/pathways', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -812,15 +830,31 @@ export function ScheduleItineraryTab({
           }),
         })
         
-        if (!response.ok) {
-          const error = await response.json()
+        if (!pathwayResponse.ok) {
+          const error = await pathwayResponse.json()
           console.error('[handleApplyAIPathway] Failed to save pathway to API:', error)
-          // Don't block the UI if saving fails
         } else {
           console.log('[handleApplyAIPathway] ✅ Pathway saved to API for trip:', trip.id)
         }
+
+        // Also save schedule blocks to API for direct access
+        const blocksResponse = await fetch('/api/user/schedule-blocks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: trip.id,
+            scheduleBlocks: updated,
+          }),
+        })
+        
+        if (!blocksResponse.ok) {
+          const error = await blocksResponse.json()
+          console.error('[handleApplyAIPathway] Failed to save schedule blocks to API:', error)
+        } else {
+          console.log('[handleApplyAIPathway] ✅ Schedule blocks saved to API for trip:', trip.id)
+        }
       } catch (error) {
-        console.error('[handleApplyAIPathway] Error saving pathway to API:', error)
+        console.error('[handleApplyAIPathway] Error saving to API:', error)
         // Don't block the UI if saving fails
       }
     }

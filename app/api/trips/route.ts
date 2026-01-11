@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
-import { getTripsByUserId, createTrip } from '@/lib/trips-storage'
+import { auth, clerkClient } from '@clerk/nextjs/server'
+import {
+  getTripsFromMetadata,
+  createTripRecord,
+  updateTripsData,
+  tripsDataToMetadata,
+} from '@/lib/trips-storage-clerk'
 import type { Trip } from '@/types'
 
 // GET /api/trips - Get all trips for the current user
@@ -14,7 +19,11 @@ export async function GET() {
       )
     }
 
-    const trips = await getTripsByUserId(userId)
+    // Get trips from Clerk user metadata
+    const client = await clerkClient()
+    const user = await client.users.getUser(userId)
+    const trips = getTripsFromMetadata(user.privateMetadata)
+
     return NextResponse.json({ trips })
   } catch (error) {
     console.error('[Trips API] GET error:', error)
@@ -47,18 +56,34 @@ export async function POST(request: Request) {
       )
     }
 
-    const trip = await createTrip(
-      {
-        title,
-        startDate,
-        endDate,
-        baseLocation,
-        learningTarget,
-      },
-      userId
-    )
+    // Get existing trips from Clerk
+    const client = await clerkClient()
+    const user = await client.users.getUser(userId)
+    const existingTrips = (user.privateMetadata?.trips?.trips || []) as any[]
 
-    return NextResponse.json({ trip }, { status: 201 })
+    // Create new trip record
+    const tripRecord = createTripRecord({
+      title,
+      startDate,
+      endDate,
+      baseLocation,
+      learningTarget,
+    })
+
+    // Update trips in metadata
+    const updatedTrips = updateTripsData(existingTrips, tripRecord)
+
+    // Save to Clerk
+    await client.users.updateUserMetadata(userId, {
+      privateMetadata: {
+        ...user.privateMetadata,
+        trips: tripsDataToMetadata(updatedTrips),
+      },
+    })
+
+    console.log('[Trips API] ✅ Trip created and saved to Clerk:', tripRecord.id)
+
+    return NextResponse.json({ trip: tripRecord.trip }, { status: 201 })
   } catch (error) {
     console.error('[Trips API] POST error:', error)
     return NextResponse.json(

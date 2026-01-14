@@ -7,15 +7,18 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { ProfileView } from '@/components/profile/ProfileView'
 import { ProfileEditDialog } from '@/components/profile/ProfileEditDialog'
+import { OnboardingModal } from '@/components/OnboardingModal'
 import { useState, useEffect } from 'react'
 import type { LearnerProfile } from '@/types'
 import { showToast } from '@/components/ui/Toast'
+import { isFirstTimeUser } from '@/lib/onboarding-utils'
 
 export default function ProfilePage() {
   const { currentUserId, currentUser } = useDemoUser()
   const [isEditing, setIsEditing] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [profile, setProfile] = useState<LearnerProfile | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   // Load profile only on client side to avoid hydration mismatch
   useEffect(() => {
@@ -29,6 +32,15 @@ export default function ProfilePage() {
     }
     loadProfile()
   }, [currentUserId])
+
+  // Check if user is first-time and show onboarding modal
+  useEffect(() => {
+    if (mounted) {
+      isFirstTimeUser(currentUserId).then((isFirstTime) => {
+        setShowOnboarding(isFirstTime)
+      })
+    }
+  }, [mounted, currentUserId])
 
   // Update profile when user changes or when exiting edit mode
   useEffect(() => {
@@ -64,7 +76,29 @@ export default function ProfilePage() {
         : getLearnerProfile(currentUserId)
       setProfile(savedProfile)
       setIsEditing(false)
-      showToast('Profile updated', 'success')
+      
+      // Check if user has trips
+      let hasTrips = false
+      try {
+        const TRIPS_STORAGE_KEY = 'michi_user_trips'
+        const stored = localStorage.getItem(`${TRIPS_STORAGE_KEY}_${currentUserId}`)
+        if (stored) {
+          const trips = JSON.parse(stored)
+          hasTrips = Array.isArray(trips) && trips.length > 0
+        }
+      } catch (error) {
+        console.error('[handleSave] Error checking trips:', error)
+      }
+      
+      // Show appropriate message
+      if (hasTrips) {
+        showToast('Profile updated', 'success')
+      } else {
+        showToast('Profile saved! Now create your first trip to get started', 'success')
+      }
+      
+      // Close onboarding modal if it was open
+      setShowOnboarding(false)
     } catch (error) {
       console.error('Error saving profile:', error)
       showToast('Failed to save profile', 'error')
@@ -120,6 +154,13 @@ export default function ProfilePage() {
         onClose={() => setIsEditing(false)}
         profile={profile}
         onSave={handleSave}
+      />
+
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onEditProfile={() => setIsEditing(true)}
+        userId={currentUserId}
       />
     </>
   )

@@ -11,6 +11,7 @@ import { showToast } from '@/components/ui/Toast'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { getTripImageUrl, getTripImageAlt } from '@/lib/trip-images'
 import Link from 'next/link'
+import { getCustomProfile, getCustomProfiles } from '@/lib/custom-users'
 
 // localStorage key for trips
 const TRIPS_STORAGE_KEY = 'michi_user_trips'
@@ -44,9 +45,45 @@ export default function Home() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [showForm, setShowForm] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasCustomProfile, setHasCustomProfile] = useState<boolean | null>(null)
+
+  // Check if user has a custom profile
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !user) {
+      setHasCustomProfile(null)
+      return
+    }
+
+    const checkProfile = async () => {
+      if (user.id.startsWith('user_')) {
+        // Clerk user: Check API
+        try {
+          const response = await fetch('/api/user/profile')
+          if (response.ok) {
+            const data = await response.json()
+            setHasCustomProfile(!!data.profile)
+          } else {
+            // Fall back to localStorage
+            const profiles = getCustomProfiles()
+            setHasCustomProfile(!!profiles[user.id])
+          }
+        } catch (error) {
+          // Fall back to localStorage
+          const profiles = getCustomProfiles()
+          setHasCustomProfile(!!profiles[user.id])
+        }
+      } else {
+        // Demo user: Check localStorage
+        const customProfile = getCustomProfile(user.id)
+        setHasCustomProfile(!!customProfile)
+      }
+    }
+
+    checkProfile()
+  }, [isLoaded, isSignedIn, user])
 
   // Load trips from localStorage (primary storage now)
-  const loadTrips = () => {
+  useEffect(() => {
     if (!isLoaded || !isSignedIn || !user) {
       setIsLoading(false)
       return
@@ -55,10 +92,6 @@ export default function Home() {
     const storedTrips = getStoredTrips(user.id)
     setTrips(storedTrips)
     setIsLoading(false)
-  }
-
-  useEffect(() => {
-    loadTrips()
   }, [isLoaded, isSignedIn, user])
 
   const handleCreateTrip = async (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
@@ -240,6 +273,44 @@ export default function Home() {
 
       {showForm && (
         <div style={{ marginBottom: 'var(--spacing-8)' }}>
+          {hasCustomProfile === false && (
+            <div
+              style={{
+                marginBottom: 'var(--spacing-4)',
+                padding: 'var(--spacing-4)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border-subtle)',
+                borderRadius: 'var(--radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-3)',
+              }}
+            >
+              <span style={{ fontSize: 'var(--font-size-lg)' }}>💡</span>
+              <div style={{ flex: 1 }}>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    lineHeight: 'var(--line-height-normal)',
+                    color: 'var(--color-text-secondary)',
+                    margin: 0,
+                  }}
+                >
+                  <strong style={{ color: 'var(--color-text-primary)' }}>Tip:</strong> Create your{' '}
+                  <Link
+                    href="/profile"
+                    style={{
+                      color: 'var(--color-michi-green)',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    learner profile
+                  </Link>{' '}
+                  first to get personalized learning pathways for your trips.
+                </p>
+              </div>
+            </div>
+          )}
           <CreateTripForm
             onSubmit={handleCreateTrip}
             onCancel={() => setShowForm(false)}

@@ -3,21 +3,31 @@
 import { SignIn } from '@clerk/nextjs'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { isFirstTimeUser } from '@/lib/onboarding-utils'
 
 export default function SignInPage() {
-  const { isSignedIn, isLoaded } = useUser()
+  const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
+  const [isChecking, setIsChecking] = useState(false)
 
-  // Redirect authenticated users to home
+  // Redirect authenticated users based on first-time status
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      router.push('/home')
+    if (isLoaded && isSignedIn && user) {
+      setIsChecking(true)
+      isFirstTimeUser(user.id).then((isFirstTime) => {
+        setIsChecking(false)
+        if (isFirstTime) {
+          router.push('/profile')
+        } else {
+          router.push('/home')
+        }
+      })
     }
-  }, [isLoaded, isSignedIn, router])
+  }, [isLoaded, isSignedIn, user, router])
 
-  // Show nothing while checking auth or redirecting
-  if (!isLoaded || isSignedIn) {
+  // Show nothing while checking auth, checking first-time status, or redirecting
+  if (!isLoaded || isSignedIn || isChecking) {
     return null
   }
 

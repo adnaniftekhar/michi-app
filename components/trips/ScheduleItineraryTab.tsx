@@ -839,8 +839,6 @@ export function ScheduleItineraryTab({
               return (
                 <Card
                   key={block.id}
-                  onClick={() => setExpandedCardId(isExpanded ? null : block.id)}
-                  className="cursor-pointer"
                   style={{
                     backgroundColor: isExpanded ? 'var(--color-surface-hover)' : 'var(--color-surface)',
                     overflow: 'hidden',

@@ -115,6 +115,13 @@ export function Header() {
             <Button
               variant="secondary"
               size="sm"
+              onClick={() => router.push('/hunts')}
+            >
+              Hunts
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => router.push('/profile')}
             >
               Profile
